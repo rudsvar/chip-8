@@ -30,7 +30,10 @@ pub enum Instruction {
     BitwiseXor(Reg, Reg),
     IncRegByReg(Reg, Reg),
     DecRegByReg(Reg, Reg),
-    BitshiftRight(Reg)
+    BitshiftRight(Reg),
+    SetVxVyMinusVx(Reg, Reg),
+    BitshiftLeft(Reg),
+    IfRegNeqReg(Reg, Reg)
 }
 
 impl Instruction {
@@ -64,6 +67,9 @@ impl Instruction {
             (8, x, y, 4) => Instruction::IncRegByReg(Reg(x), Reg(y)),
             (8, x, y, 5) => Instruction::DecRegByReg(Reg(x), Reg(y)),
             (8, x, _, 6) => Instruction::BitshiftRight(Reg(x)),
+            (8, x, y, 7) => Instruction::SetVxVyMinusVx(Reg(x), Reg(y)),
+            (8, x, _, 0xE) => Instruction::BitshiftLeft(Reg(x)),
+            (9, x, y, 0) => Instruction::IfRegNeqReg(Reg(x), Reg(y)),
             _ => panic!("Unknown opcode!") // TODO: Use Option?
         }
     }
@@ -92,6 +98,9 @@ mod tests {
         assert_eq!(Instruction::IncRegByReg(Reg(0xA), Reg(0xB)), Instruction::from_u16(0x8AB4));
         assert_eq!(Instruction::DecRegByReg(Reg(0xA), Reg(0xB)), Instruction::from_u16(0x8AB5));
         assert_eq!(Instruction::BitshiftRight(Reg(0xA)), Instruction::from_u16(0x8AB6));
+        assert_eq!(Instruction::SetVxVyMinusVx(Reg(0xA), Reg(0xB)), Instruction::from_u16(0x8AB7));
+        assert_eq!(Instruction::BitshiftLeft(Reg(0xA)), Instruction::from_u16(0x8A0E));
+        assert_eq!(Instruction::IfRegNeqReg(Reg(0xA), Reg(0xB)), Instruction::from_u16(0x9AB0));
     }
 
     #[test]
