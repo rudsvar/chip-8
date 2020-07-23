@@ -2,15 +2,15 @@ use crate::bit_splitter::BitSplitter;
 
 /// A wrapper for addresses.
 #[derive(Debug, PartialEq, Eq)]
-pub struct Addr(u16);
+pub struct Addr(pub u16);
 
 /// A wrapper for registers.
 #[derive(Debug, PartialEq, Eq)]
-pub struct Reg(u8);
+pub struct Reg(pub u8);
 
 /// A wrapper for constants.
 #[derive(Debug, PartialEq, Eq)]
-pub struct Const(u8);
+pub struct Const(pub u8);
 
 /// A single instruction from the CHIP-8 instruction set.
 /// Two bytes written in hexadecimal, with the following special characters:

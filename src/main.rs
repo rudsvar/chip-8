@@ -23,10 +23,11 @@ fn main() -> std::io::Result<()> {
 
     // Get configuration and read input file
     let opt = Opt::from_args();
-    let data = std::fs::read(opt.input)?;
+    let program = std::fs::read(opt.input)?;
 
     // Load instructions into emulator memory
-    let mut emulator = Emulator::new(&data);
+    let mut emulator = Emulator::new();
+    emulator.load(&program);
     emulator.execute(); // Start execution
 
     Ok(())
