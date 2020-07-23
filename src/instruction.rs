@@ -13,27 +13,50 @@ pub struct Reg(u8);
 pub struct Const(u8);
 
 /// A single instruction from the CHIP-8 instruction set.
+/// Two bytes written in hexadecimal, with the following special characters:
+/// - NNN: address
+/// - NN: 8-bit constant
+/// - N: 4-bit constant
+/// - X and Y: 4-bit register identifier
+/// - PC: Program counter
+/// - I: 16 bit register for memory address
+/// - VN: One of the 16 available variables (register identifiers)
 #[derive(Debug, PartialEq, Eq)]
 pub enum Instruction {
-    ClearScreen,
-    Return,
-    Goto(Addr),
-    Call(Addr),
-    IfRegEqConst(Reg, Const),
-    IfRegNeqConst(Reg, Const),
-    IfRegEqReg(Reg, Reg),
-    SetRegToConst(Reg, Const),
-    IncRegByConst(Reg, Const),
-    SetRegToReg(Reg, Reg),
-    BitwiseOr(Reg, Reg),
-    BitwiseAnd(Reg, Reg),
-    BitwiseXor(Reg, Reg),
-    IncRegByReg(Reg, Reg),
-    DecRegByReg(Reg, Reg),
-    BitshiftRight(Reg),
-    SetVxVyMinusVx(Reg, Reg),
-    BitshiftLeft(Reg),
-    IfRegNeqReg(Reg, Reg)
+    ClearScreen, // 00E0
+    Return, // 00EE
+    Goto(Addr), // 1NNN
+    Call(Addr), // 2NNN
+    IfRegEqConst(Reg, Const), // 3XNN
+    IfRegNeqConst(Reg, Const), // 4XNN
+    IfRegEqReg(Reg, Reg), // 5XY0
+    SetRegToConst(Reg, Const), // 6XNN
+    IncRegByConst(Reg, Const), // 7XNN
+    SetRegToReg(Reg, Reg), // 8XY0
+    BitwiseOr(Reg, Reg), // 8XY1
+    BitwiseAnd(Reg, Reg), // 8XY2
+    BitwiseXor(Reg, Reg), // 8XY3
+    IncRegByReg(Reg, Reg), // 8XY4
+    DecRegByReg(Reg, Reg), // 8XY5
+    BitshiftRight(Reg), // 8XY6
+    SetVxVyMinusVx(Reg, Reg), // 8XY7
+    BitshiftLeft(Reg), // 8XYE
+    IfRegNeqReg(Reg, Reg), // 9XY0
+    SetI(Addr), // ANNN
+    SetPcToV0PlusAddr(Addr), // BNNN
+    SetVxRand(Reg, Const), // CXNN
+    Draw(Reg, Reg, Const), // DXYN
+    IfKeyEqVx(Reg), // EX9E
+    IfKeyNeqVx(Reg), // EXA1
+    SetRegToDelayTimer(Reg), // FX07
+    SetRegToGetKey(Reg), // FX0A
+    SetDelayTimerToReg(Reg), // FX15
+    SetSoundTimerToReg(Reg), // FX18
+    AddRegToI(Reg), // FX1E
+    SetIToSpriteAddrVx(Reg), // FX29
+    SetIToBcdOfReg(Reg), // FX33
+    RegDump(Reg), // FX55
+    RegLoad(Reg) // FX65
 }
 
 impl Instruction {
@@ -70,6 +93,21 @@ impl Instruction {
             (8, x, y, 7) => Instruction::SetVxVyMinusVx(Reg(x), Reg(y)),
             (8, x, _, 0xE) => Instruction::BitshiftLeft(Reg(x)),
             (9, x, y, 0) => Instruction::IfRegNeqReg(Reg(x), Reg(y)),
+            (0xA, _, _, _) => Instruction::SetI(Addr(opcode.last_12_bits())),
+            (0xB, _, _, _) => Instruction::SetPcToV0PlusAddr(Addr(opcode.last_12_bits())),
+            (0xC, x, _, _) => Instruction::SetVxRand(Reg(x), Const(opcode.last_8_bits())),
+            (0xD, x, y, n) => Instruction::Draw(Reg(x), Reg(y), Const(n)),
+            (0xE, x, 9, 0xE) => Instruction::IfKeyEqVx(Reg(x)),
+            (0xE, x, 0xA, 1) => Instruction::IfKeyNeqVx(Reg(x)),
+            (0xF, x, 0, 7) => Instruction::SetRegToDelayTimer(Reg(x)),
+            (0xF, x, 0, 0xA) => Instruction::SetRegToGetKey(Reg(x)),
+            (0xF, x, 1, 5) => Instruction::SetDelayTimerToReg(Reg(x)),
+            (0xF, x, 1, 8) => Instruction::SetSoundTimerToReg(Reg(x)),
+            (0xF, x, 1, 0xE) => Instruction::AddRegToI(Reg(x)),
+            (0xF, x, 2, 9) => Instruction::SetIToSpriteAddrVx(Reg(x)),
+            (0xF, x, 3, 3) => Instruction::SetIToBcdOfReg(Reg(x)),
+            (0xF, x, 5, 5) => Instruction::RegDump(Reg(x)),
+            (0xF, x, 6, 5) => Instruction::RegLoad(Reg(x)),
             _ => panic!("Unknown opcode!") // TODO: Use Option?
         }
     }
@@ -101,6 +139,21 @@ mod tests {
         assert_eq!(Instruction::SetVxVyMinusVx(Reg(0xA), Reg(0xB)), Instruction::from_u16(0x8AB7));
         assert_eq!(Instruction::BitshiftLeft(Reg(0xA)), Instruction::from_u16(0x8A0E));
         assert_eq!(Instruction::IfRegNeqReg(Reg(0xA), Reg(0xB)), Instruction::from_u16(0x9AB0));
+        assert_eq!(Instruction::SetI(Addr(0x25)), Instruction::from_u16(0xA025));
+        assert_eq!(Instruction::SetPcToV0PlusAddr(Addr(0x25)), Instruction::from_u16(0xB025));
+        assert_eq!(Instruction::SetVxRand(Reg(0xA), Const(0x23)), Instruction::from_u16(0xCA23));
+        assert_eq!(Instruction::Draw(Reg(0xA), Reg(0xB), Const(0xC)), Instruction::from_u16(0xDABC));
+        assert_eq!(Instruction::IfKeyEqVx(Reg(0xA)), Instruction::from_u16(0xEA9E));
+        assert_eq!(Instruction::IfKeyNeqVx(Reg(0xA)), Instruction::from_u16(0xEAA1));
+        assert_eq!(Instruction::SetRegToDelayTimer(Reg(0xA)), Instruction::from_u16(0xFA07));
+        assert_eq!(Instruction::SetRegToGetKey(Reg(0xA)), Instruction::from_u16(0xFA0A));
+        assert_eq!(Instruction::SetDelayTimerToReg(Reg(0xA)), Instruction::from_u16(0xFA15));
+        assert_eq!(Instruction::SetSoundTimerToReg(Reg(0xA)), Instruction::from_u16(0xFA18));
+        assert_eq!(Instruction::AddRegToI(Reg(0xA)), Instruction::from_u16(0xFA1E));
+        assert_eq!(Instruction::SetIToSpriteAddrVx(Reg(0xA)), Instruction::from_u16(0xFA29));
+        assert_eq!(Instruction::SetIToBcdOfReg(Reg(0xA)), Instruction::from_u16(0xFA33));
+        assert_eq!(Instruction::RegDump(Reg(0xA)), Instruction::from_u16(0xFA55));
+        assert_eq!(Instruction::RegLoad(Reg(0xA)), Instruction::from_u16(0xFA65));
     }
 
     #[test]
