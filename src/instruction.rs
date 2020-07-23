@@ -23,7 +23,7 @@ pub struct Const(pub u8);
 /// - VN: One of the 16 available variables (register identifiers)
 #[derive(Debug, PartialEq, Eq)]
 pub enum Instruction {
-    Halt, // My own, 0000
+    Halt, // My own, FFFF
     ClearScreen, // 00E0
     Return, // 00EE
     Goto(Addr), // 1NNN
@@ -76,7 +76,7 @@ impl Instruction {
     pub fn from_two_u8(left: u8, right: u8) -> Instruction {
         let opcode = BitSplitter::new(left, right);
         match opcode.as_four_u8() {
-            (0, 0, 0, 0) => Instruction::Halt,
+            (0xF, 0xF, 0xF, 0xF) => Instruction::Halt,
             (0, 0, 0xE, 0) => Instruction::ClearScreen,
             (0, 0, 0xE, 0xE) => Instruction::Return,
             (1, _, _, _) => Instruction::Goto(Addr(opcode.last_12_bits())),

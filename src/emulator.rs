@@ -1,13 +1,15 @@
 //! The CHIP-8 emulator as described at https://en.wikipedia.org/wiki/CHIP-8#Virtual_machine_description.
 
 use crate::instruction::*;
+use std::fmt;
 
 const MEM_SIZE: usize = 4096;
 const NUM_REGISTERS: usize = 16;
 const STACK_SIZE: usize = 256;
 const SCREEN_WIDTH: usize = 64;
 const SCREEN_HEIGHT: usize = 32;
-const EMPTY_SCREEN: [[bool; SCREEN_WIDTH]; SCREEN_HEIGHT] = [[false; SCREEN_WIDTH]; SCREEN_HEIGHT];
+type Screen = [[bool; SCREEN_WIDTH]; SCREEN_HEIGHT];
+const EMPTY_SCREEN: Screen = [[false; SCREEN_WIDTH]; SCREEN_HEIGHT];
 const PC_START: u16 = 0x200;
 
 pub struct Emulator {
@@ -19,7 +21,20 @@ pub struct Emulator {
     program_counter: u16,
     stack_pointer: u8,
     stack: [u16; STACK_SIZE],
-    screen: [[bool; SCREEN_WIDTH]; SCREEN_HEIGHT]
+    screen: Screen
+}
+
+impl fmt::Display for Emulator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for row in &self.screen {
+            for c in row.iter() {
+                write!(f, "{}", if *c { "# " } else { "  " })?;
+            }
+            writeln!(f)?;
+        }
+
+        Ok(())
+    }
 }
 
 impl Emulator {
@@ -72,27 +87,185 @@ impl Emulator {
     /// Execute a single instruction
     fn execute_single(&mut self, instruction: Instruction) -> bool {
         match instruction {
+
+            // Halt execution. Mostly for debugging.
             Instruction::Halt => return false,
+
+            // Clear the screen
             Instruction::ClearScreen => self.screen = EMPTY_SCREEN,
+
+            // Return to the previous call site via the stack.
             Instruction::Return => {
                 self.stack_pointer -= 1;
                 self.program_counter = self.stack[self.stack_pointer as usize]; // Jump back via stack
             }
+
+            // Go to a specific memory address
+            Instruction::Goto(Addr(addr)) => {
+                self.program_counter = addr;
+            }
+
+            // Store the current address on the stack, then jump to the specified address
             Instruction::Call(Addr(addr)) => {
                 self.stack[self.stack_pointer as usize] = self.program_counter; // Store current address
-                self.program_counter = addr; // Jump to addr
                 self.stack_pointer += 1;
+                self.program_counter = addr; // Jump to addr
             }
-            i => {
-                println!("Unimplemented instruction {:?}", i);
+
+            // If the register equals the constant, skip the next instruction
+            Instruction::IfRegEqConst(Reg(x), Const(n)) => {
+                if self.registers[x as usize] == n {
+                    self.program_counter += 2;
+                }
+            }
+
+            Instruction::IfRegNeqConst(Reg(x), Const(n)) => {
+                if self.registers[x as usize] != n {
+                    self.program_counter += 2;
+                }
+            }
+
+            Instruction::IfRegEqReg(Reg(x), Reg(y)) => {
+                if self.registers[x as usize] == self.registers[y as usize] {
+                    self.program_counter += 2;
+                }
+            }
+
+            Instruction::SetRegToConst(Reg(x), Const(n)) => {
+                self.registers[x as usize] = n;
+            }
+
+            // Should this overflow?
+            Instruction::IncRegByConst(Reg(x), Const(n)) => {
+                self.registers[x as usize] = self.registers[x as usize].overflowing_add(n).0;
+            }
+
+            Instruction::SetRegToReg(Reg(x), Reg(y)) => {
+                self.registers[x as usize] = self.registers[y as usize];
+            }
+
+            Instruction::BitwiseOr(Reg(x), Reg(y)) => {
+                self.registers[x as usize] |= self.registers[y as usize];
+            }
+
+            Instruction::BitwiseAnd(Reg(x), Reg(y)) => {
+                self.registers[x as usize] &= self.registers[y as usize];
+            }
+
+            Instruction::BitwiseXor(Reg(x), Reg(y)) => {
+                self.registers[x as usize] ^= self.registers[y as usize];
+            }
+
+            // Increment the value of a register by the value of another
+            // TODO: Set VF to 1 if there is a carry, 0 otherwise.
+            Instruction::IncRegByReg(Reg(x), Reg(y)) => {
+                self.registers[x as usize] += self.registers[y as usize];
+            }
+
+            // Decrement the value of a register by the value of another
+            // TODO: Set VF to 0 if there is a borrow, 1 otherwise.
+            Instruction::DecRegByReg(Reg(x), Reg(y)) => {
+                self.registers[x as usize] -= self.registers[y as usize];
+            }
+
+            Instruction::BitshiftRight(Reg(x)) => {
+                self.registers[x as usize] >>= 1;
+            }
+
+            // TODO: VF is set to 0 when there's a borrow, and 1 when there isn't.
+            Instruction::SetVxVyMinusVx(Reg(x), Reg(y)) => {
+                self.registers[x as usize] = self.registers[y as usize] - self.registers[x as usize];
+            }
+
+            Instruction::BitshiftLeft(Reg(x)) => {
+                self.registers[x as usize] <<= 1;
+            }
+
+            Instruction::IfRegNeqReg(Reg(x), Reg(y)) => {
+                if self.registers[x as usize] != self.registers[y as usize] {
+                    self.program_counter += 2;
+                }
+            }
+
+            Instruction::SetI(Addr(addr)) => {
+                self.i = addr;
+            }
+
+            Instruction::SetPcToV0PlusAddr(Addr(addr)) => {
+                self.program_counter = self.registers[0] as u16 + addr; 
+            }
+
+            Instruction::SetVxRand(Reg(x), Const(n)) => {
+                self.registers[x as usize] = rand::random::<u8>() & n; 
+            }
+
+            // TOOD: Implement fully, with xor of pixels.
+            Instruction::Draw(Reg(x), Reg(y), Const(n)) => {
+                let x_coord = self.registers[x as usize];
+                let y_coord = self.registers[y as usize];
+                self.screen[y_coord as usize][x_coord as usize] = !self.screen[y_coord as usize][x_coord as usize];
+            }
+
+            // TODO: How to do this without blocking?
+            Instruction::IfKeyEqVx(_) => {}
+            Instruction::IfKeyNeqVx(_) => {}
+
+            Instruction::SetRegToDelayTimer(Reg(x)) => {
+                self.registers[x as usize] = self.delay_timer;
+            }
+
+            // TODO: Get key (blocking)
+            Instruction::SetRegToGetKey(_) => {}
+
+            Instruction::SetDelayTimerToReg(Reg(x)) => {
+                self.delay_timer = self.registers[x as usize];
+            }
+
+            Instruction::SetSoundTimerToReg(Reg(x)) => {
+                self.sound_timer = self.registers[x as usize];
+            }
+
+            Instruction::AddRegToI(Reg(x)) => {
+                self.i += self.registers[x as usize] as u16;
+            }
+
+            // TODO: How do sprites work?
+            Instruction::SetIToSpriteAddrVx(Reg(x)) => {}
+
+            Instruction::SetIToBcdOfReg(Reg(x)) => {
+                let i = self.i as usize;
+
+                // Get ones place
+                let ones = self.registers[x as usize];
+                self.memory[i + 2] = (ones % 10) as u8;
+
+                // Get tens place
+                let tens = ones / 10;
+                self.memory[i + 1] = (tens % 10) as u8;
+
+                // Get hundredths place
+                let hundredths = tens / 10;
+                self.memory[i] = (hundredths / 10) as u8;
+            }
+
+            // Dump register values up to Vx
+            Instruction::RegDump(Reg(x)) => {
+                let i = self.i as usize;
+                for reg_no in 0..=x as usize {
+                    self.memory[i + reg_no] = self.registers[reg_no];
+                }
+            }
+            
+            // Load register values up to Vx
+            Instruction::RegLoad(Reg(x)) => {
+                let i = self.i as usize;
+                for reg_no in 0..=x as usize {
+                    self.registers[reg_no] = self.memory[i + reg_no];
+                }
             }
         };
 
         true
-    }
-
-    pub fn execute(&mut self) {
-        while self.step() {};
     }
 }
 
@@ -105,6 +278,21 @@ mod tests {
     fn halts_upon_reaching_halt_instruction() {
         let mut emulator = Emulator::new();
         assert_eq!(emulator.execute_single(Instruction::Halt), false);
+    }
+
+    #[test]
+    fn clear_screen_clears_screen() {
+        let mut emulator = Emulator::new();
+        emulator.screen[0][0] = true;
+        emulator.execute_single(Instruction::ClearScreen);
+        assert_eq!(emulator.screen[0][0], false);
+    }
+
+    #[test]
+    fn goto_goes_to() {
+        let mut emulator = Emulator::new();
+        emulator.execute_single(Instruction::Goto(Addr(0x250)));
+        assert_eq!(emulator.program_counter, 0x250);
     }
 
     #[test]
