@@ -5,6 +5,10 @@ pub struct BitSplitter(u8, u8);
 
 impl BitSplitter {
 
+    pub fn from_u16(value: u16) -> BitSplitter {
+        BitSplitter((value >> 8) as u8, (value & 0x00FF) as u8)
+    }
+
     pub fn new(left: u8, right: u8) -> BitSplitter {
         BitSplitter(left, right)
     }
@@ -37,5 +41,44 @@ impl BitSplitter {
 
     pub fn last_12_bits(&self) -> u16 {
         self.as_u16() & 0x0FFF
+    }
+
+    pub fn get(&self, start: usize, end: usize) -> Option<u16> {
+        if end > 16 {
+            return None;
+        }
+        let mut value = self.as_u16();
+        value &= 0xFFFF >> start; // Remove start we don't want
+        value >>= 16 - end; // Remove end we don't want and shift to lowest position
+        Some(value)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn get_from_start_behaves_correctly() {
+        assert_eq!(Some(0xFFFF), BitSplitter::from_u16(0xFFFF).get(0, 16));
+        assert_eq!(Some(0xFFF), BitSplitter::from_u16(0xFFFF).get(0, 12));
+        assert_eq!(Some(0xFF), BitSplitter::from_u16(0xFFFF).get(0, 8));
+        assert_eq!(Some(0xF), BitSplitter::from_u16(0xFFFF).get(0, 4));
+        assert_eq!(Some(0x1), BitSplitter::from_u16(0xFFFF).get(0, 1));
+    }
+
+    #[test]
+    fn get_in_middle_behaves_correctly() {
+        assert_eq!(Some(0xAB), BitSplitter::from_u16(0xABCD).get(0, 8));
+        assert_eq!(Some(0xBC), BitSplitter::from_u16(0xABCD).get(4, 12));
+        assert_eq!(Some(0xBCD), BitSplitter::from_u16(0xABCD).get(4, 16));
+    }
+
+    #[test]
+    fn get_components() {
+        assert_eq!(Some(0xA), BitSplitter::from_u16(0xABCD).get(0, 4));
+        assert_eq!(Some(0xB), BitSplitter::from_u16(0xABCD).get(4, 8));
+        assert_eq!(Some(0xC), BitSplitter::from_u16(0xABCD).get(8, 12));
+        assert_eq!(Some(0xD), BitSplitter::from_u16(0xABCD).get(12, 16));
     }
 }
