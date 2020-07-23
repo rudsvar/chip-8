@@ -28,6 +28,6 @@ fn main() -> std::io::Result<()> {
     // Load instructions into emulator memory
     let mut emulator = Emulator::new(&data);
     emulator.execute(); // Start execution
-    
+
     Ok(())
 }

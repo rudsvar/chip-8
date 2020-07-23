@@ -29,8 +29,8 @@ impl Emulator {
             stack: [0; 256],
             screen: [[false; 64]; 32]
         };
-        for i in 0..std::cmp::min(memory.len(), emulator.memory.len()) {
-            emulator.memory[i] = memory[i];
+        for i in 0..std::cmp::min(memory.len(), emulator.memory.len() - 0x200) {
+            emulator.memory[emulator.PC as usize + i] = memory[i];
         }
         emulator
     }
@@ -43,9 +43,19 @@ impl Emulator {
         let instruction = Instruction::from_two_u8(left, right);
         self.PC += 2;
 
+        // Update timers
+        if self.delay_timer > 0 {
+            self.delay_timer -= 1;
+        }
+
+        if self.sound_timer > 0 {
+            self.sound_timer -= 1;
+        }
+
         match instruction {
-            _ => {
-                println!("Stepped");
+            Instruction::Halt => false,
+            i => {
+                println!("Executing {:?}", i);
                 true
             }
         }
