@@ -8,8 +8,8 @@ const NUM_REGISTERS: usize = 16;
 const STACK_SIZE: usize = 256;
 const SCREEN_WIDTH: usize = 64;
 const SCREEN_HEIGHT: usize = 32;
-type Screen = [[bool; SCREEN_WIDTH]; SCREEN_HEIGHT];
-const EMPTY_SCREEN: Screen = [[false; SCREEN_WIDTH]; SCREEN_HEIGHT];
+type Screen = [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT];
+const EMPTY_SCREEN: Screen = [[0; SCREEN_WIDTH]; SCREEN_HEIGHT];
 const PC_START: u16 = 0x200;
 
 pub struct Emulator {
@@ -28,7 +28,7 @@ impl fmt::Display for Emulator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for row in &self.screen {
             for c in row.iter() {
-                write!(f, "{}", if *c { "# " } else { "  " })?;
+                write!(f, "{}", if *c == 1 { "#" } else { " " })?;
             }
             writeln!(f)?;
         }
@@ -200,22 +200,52 @@ impl Emulator {
             }
 
             // TOOD: Implement fully, with xor of pixels.
-            Instruction::Draw(Reg(x), Reg(y), Const(n)) => {
-                let x_coord = self.registers[x as usize];
-                let y_coord = self.registers[y as usize];
-                self.screen[y_coord as usize][x_coord as usize] = !self.screen[y_coord as usize][x_coord as usize];
+            Instruction::Draw(Reg(x), Reg(y), Const(sprite_height)) => {
+
+                // Get coordinates
+                let x_coord = self.registers[x as usize] as usize;
+                let y_coord = self.registers[y as usize] as usize;
+
+                // Get sprite, each row is 8 bits
+                let sprite_addr = self.i as usize;
+                let sprite_data: &[u8] = &self.memory[sprite_addr .. sprite_addr + sprite_height as usize];
+
+                // Write to screen
+                let mut any_collisions = 0;
+                for y in 0 .. sprite_height as usize {
+                    let row: u8 = sprite_data[y];
+                    for x in 0 .. 8 {
+                        let new_pixel = (row >> (8 - x)) & 1; // Get bit number `bit_idx`
+                        let old_pixel = &mut self.screen[y_coord + y][x_coord + x];
+                        let xored_pixel = *old_pixel ^ new_pixel; // XOR old pixel with new pixel
+                        if *old_pixel == 1 && xored_pixel == 0 {
+                            // Set pixel is unset
+                            any_collisions = 1;
+                        }
+                        *old_pixel = xored_pixel; // Save xor'ed pixel
+                    }
+                }
+
+                // Set VF collision flag
+                self.registers[0xF] = any_collisions;
             }
 
-            // TODO: How to do this without blocking?
-            Instruction::IfKeyEqVx(_) => {}
-            Instruction::IfKeyNeqVx(_) => {}
+            // TODO: Skip if the key in Vx is pressed
+            Instruction::IfKeyEqVx(Reg(x)) => {
+            }
+
+            // TODO: Skip if the key in Vx isn't pressed
+            Instruction::IfKeyNeqVx(_) => {
+                self.program_counter += 2;
+            }
 
             Instruction::SetRegToDelayTimer(Reg(x)) => {
                 self.registers[x as usize] = self.delay_timer;
             }
 
-            // TODO: Get key (blocking)
-            Instruction::SetRegToGetKey(_) => {}
+            // Get a key press (blocking)
+            Instruction::SetRegToGetKey(Reg(x)) => {
+            }
 
             Instruction::SetDelayTimerToReg(Reg(x)) => {
                 self.delay_timer = self.registers[x as usize];

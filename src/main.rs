@@ -2,10 +2,7 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 use chip_8::emulator::Emulator;
 use termion::screen::AlternateScreen;
-use termion::event::{Key, Event, MouseEvent};
-use termion::input::{TermRead, MouseTerminal};
-use termion::raw::IntoRawMode;
-use std::io::{Write, stdout, stdin};
+use std::io::{Write, stdout};
 
 /// A basic example
 #[derive(StructOpt, Debug)]
@@ -41,7 +38,7 @@ fn main() -> std::io::Result<()> {
     while emulator.step() {
         write!(screen, "{}", termion::cursor::Goto(1,1))?;
         write!(screen, "{}", emulator)?;
-        std::thread::sleep(std::time::Duration::from_millis(1000/60))
+        std::thread::sleep(std::time::Duration::from_micros(1_000_000/60))
     }
 
     Ok(())
