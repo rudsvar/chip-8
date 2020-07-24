@@ -1,6 +1,11 @@
 use std::path::PathBuf;
 use structopt::StructOpt;
 use chip_8::emulator::Emulator;
+use termion::screen::AlternateScreen;
+use termion::event::{Key, Event, MouseEvent};
+use termion::input::{TermRead, MouseTerminal};
+use termion::raw::IntoRawMode;
+use std::io::{Write, stdout, stdin};
 
 /// A basic example
 #[derive(StructOpt, Debug)]
@@ -25,10 +30,19 @@ fn main() -> std::io::Result<()> {
     let opt = Opt::from_args();
     let program = std::fs::read(opt.input)?;
 
+    let mut screen = AlternateScreen::from(stdout());
+
     // Load instructions into emulator memory
     let mut emulator = Emulator::new();
     emulator.load(&program);
-    emulator.execute(); // Start execution
+
+
+    // Start execution
+    while emulator.step() {
+        write!(screen, "{}", termion::cursor::Goto(1,1))?;
+        write!(screen, "{}", emulator)?;
+        std::thread::sleep(std::time::Duration::from_millis(1000/60))
+    }
 
     Ok(())
 }
