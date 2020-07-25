@@ -23,7 +23,6 @@ pub struct Const(pub u8);
 /// - VN: One of the 16 available variables (register identifiers)
 #[derive(Debug, PartialEq, Eq)]
 pub enum Instruction {
-    Halt, // My own, FFFF
     ClearScreen, // 00E0
     Return, // 00EE
     Goto(Addr), // 1NNN
@@ -76,7 +75,6 @@ impl Instruction {
     pub fn from_two_u8(left: u8, right: u8) -> Instruction {
         let opcode = BitSplitter::new(left, right);
         match opcode.as_four_u8() {
-            (0xF, 0xF, 0xF, 0xF) => Instruction::Halt,
             (0, 0, 0xE, 0) => Instruction::ClearScreen,
             (0, 0, 0xE, 0xE) => Instruction::Return,
             (1, _, _, _) => Instruction::Goto(Addr(opcode.last_12_bits())),
@@ -110,7 +108,11 @@ impl Instruction {
             (0xF, x, 3, 3) => Instruction::SetIToBcdOfReg(Reg(x)),
             (0xF, x, 5, 5) => Instruction::RegDump(Reg(x)),
             (0xF, x, 6, 5) => Instruction::RegLoad(Reg(x)),
-            _ => panic!("Unknown opcode!") // TODO: Use Option?
+            _ => {
+                // TODO: Use Option?
+                log::error!("Unknown opcode {:#06x}", opcode.as_u16());
+                panic!("Unknown opcode!")
+            }
         }
     }
 }

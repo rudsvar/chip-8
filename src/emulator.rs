@@ -28,7 +28,7 @@ impl fmt::Display for Emulator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for row in &self.screen {
             for c in row.iter() {
-                write!(f, "{}", if *c == 1 { "#" } else { " " })?;
+                write!(f, "{}", if *c == 1 { "# " } else { "  " })?;
             }
             writeln!(f)?;
         }
@@ -79,6 +79,8 @@ impl Emulator {
         let right = self.memory[self.program_counter as usize + 1];
         let instruction = Instruction::from_two_u8(left, right);
 
+        log::trace!("{:?}", instruction);
+
         self.program_counter += 2; // TODO: Make this more error resistant?
 
         self.execute_single(instruction)
@@ -87,9 +89,6 @@ impl Emulator {
     /// Execute a single instruction
     fn execute_single(&mut self, instruction: Instruction) -> bool {
         match instruction {
-
-            // Halt execution. Mostly for debugging.
-            Instruction::Halt => return false,
 
             // Clear the screen
             Instruction::ClearScreen => self.screen = EMPTY_SCREEN,
@@ -245,6 +244,7 @@ impl Emulator {
 
             // Get a key press (blocking)
             Instruction::SetRegToGetKey(Reg(x)) => {
+                log::warn!("Unimplemented: SetRegToGetKey");
             }
 
             Instruction::SetDelayTimerToReg(Reg(x)) => {
@@ -259,8 +259,10 @@ impl Emulator {
                 self.i += self.registers[x as usize] as u16;
             }
 
-            // TODO: How do sprites work?
-            Instruction::SetIToSpriteAddrVx(Reg(x)) => {}
+            // TODO: Add font sprites?
+            Instruction::SetIToSpriteAddrVx(Reg(x)) => {
+                log::warn!("Unimplemented: SetIToSpriteAddrVx");
+            }
 
             Instruction::SetIToBcdOfReg(Reg(x)) => {
                 let i = self.i as usize;
@@ -305,17 +307,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn halts_upon_reaching_halt_instruction() {
-        let mut emulator = Emulator::new();
-        assert_eq!(emulator.execute_single(Instruction::Halt), false);
-    }
-
-    #[test]
     fn clear_screen_clears_screen() {
         let mut emulator = Emulator::new();
-        emulator.screen[0][0] = true;
+        emulator.screen[0][0] = 1;
         emulator.execute_single(Instruction::ClearScreen);
-        assert_eq!(emulator.screen[0][0], false);
+        assert_eq!(emulator.screen[0][0], 0);
     }
 
     #[test]

@@ -4,6 +4,11 @@ use chip_8::emulator::Emulator;
 use termion::screen::AlternateScreen;
 use std::io::{Write, stdout};
 
+use log::LevelFilter;
+use log4rs::append::file::FileAppender;
+use log4rs::encode::pattern::PatternEncoder;
+use log4rs::config::{Appender, Config, Root};
+
 /// A basic example
 #[derive(StructOpt, Debug)]
 #[structopt(name = "basic")]
@@ -23,8 +28,22 @@ struct Opt {
 
 fn main() -> std::io::Result<()> {
 
+    let logfile = FileAppender::builder()
+        .build("log/output.log").unwrap();
+
+    let config = Config::builder()
+        .appender(Appender::builder()
+            .build("logfile", Box::new(logfile)))
+        .build(Root::builder()
+            .appender("logfile")
+            .build(LevelFilter::Trace))
+        .unwrap();
+
+    log4rs::init_config(config).unwrap();
+
     // Get configuration and read input file
     let opt = Opt::from_args();
+    log::info!("Executing {:?}", &opt.input);
     let program = std::fs::read(opt.input)?;
 
     let mut screen = AlternateScreen::from(stdout());
