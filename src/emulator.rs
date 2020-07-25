@@ -6,12 +6,13 @@ const MEM_SIZE: usize = 4096;
 const NUM_REGISTERS: usize = 16;
 const STACK_SIZE: usize = 256;
 const SCREEN_WIDTH: usize = 128;
-const SCREEN_HEIGHT: usize = 64;
+const SCREEN_HEIGHT: usize = 128;
 type Screen = [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT];
 const EMPTY_SCREEN: Screen = [[0; SCREEN_WIDTH]; SCREEN_HEIGHT];
 const PC_START: u16 = 0x200;
 
 pub struct Emulator {
+    // Standard fields
     memory: [u8; MEM_SIZE],
     registers: [u8; NUM_REGISTERS],
     delay_timer: u8,
@@ -21,7 +22,8 @@ pub struct Emulator {
     stack_pointer: u8,
     stack: [u16; STACK_SIZE],
     screen: Screen,
-    screen_update_locations: Vec<(usize, usize)>
+    // Custom fields
+    pixels_to_redraw: Vec<(usize, usize)>
 }
 
 impl Emulator {
@@ -38,7 +40,7 @@ impl Emulator {
             stack_pointer: 0,
             stack: [0; STACK_SIZE],
             screen: EMPTY_SCREEN,
-            screen_update_locations: Vec::new()
+            pixels_to_redraw: Vec::new()
         }
     }
 
@@ -49,7 +51,19 @@ impl Emulator {
 
     /// Get a list of all positions that have been updated during the previous step.
     pub fn get_screen_update_locations(&self) -> &Vec<(usize, usize)> {
-        &self.screen_update_locations
+        &self.pixels_to_redraw
+    }
+
+    /// Tell the screen to update all drawn pixels.
+    pub fn flag_all_pixels_for_redrawing(&mut self) {
+        self.pixels_to_redraw = Vec::new();
+        for y in 0..SCREEN_HEIGHT {
+            for x in 0..SCREEN_WIDTH {
+                if self.screen[y][x] == 1 {
+                    self.pixels_to_redraw.push((x,y));
+                }
+            }
+        }
     }
 
     /// Copy a program into memory at 0x200.
@@ -61,7 +75,7 @@ impl Emulator {
 
     /// Perform a single step, which will update timers,
     /// then load an instruction and execute it.
-    pub fn step(&mut self) -> bool {
+    pub fn step(&mut self, keys_pressed: &[bool; 0xF]) -> bool {
 
         // Update timers
         if self.delay_timer > 0 {
@@ -79,19 +93,22 @@ impl Emulator {
 
         log::trace!("{:?}", instruction);
 
-        self.screen_update_locations = Vec::new();
+        self.pixels_to_redraw = Vec::new();
 
         self.program_counter += 2; // TODO: Make this more error resistant?
 
-        self.execute_single(instruction)
+        self.execute_single(instruction, keys_pressed)
     }
 
     /// Execute a single instruction
-    fn execute_single(&mut self, instruction: Instruction) -> bool {
+    fn execute_single(&mut self, instruction: Instruction, keys_pressed: &[bool; 0xF]) -> bool {
         match instruction {
 
             // Clear the screen
-            Instruction::ClearScreen => self.screen = EMPTY_SCREEN,
+            Instruction::ClearScreen => {
+                self.flag_all_pixels_for_redrawing();
+                self.screen = EMPTY_SCREEN;
+            },
 
             // Return to the previous call site via the stack.
             Instruction::Return => {
@@ -136,7 +153,7 @@ impl Emulator {
 
             // Should this overflow?
             Instruction::IncRegByConst(Reg(x), Const(n)) => {
-                self.registers[x as usize] = self.registers[x as usize].overflowing_add(n).0;
+                self.registers[x as usize] = self.registers[x as usize] + n;
             }
 
             Instruction::SetRegToReg(Reg(x), Reg(y)) => {
@@ -223,8 +240,7 @@ impl Emulator {
                         }
                         // Store updated locations
                         if *old_pixel != xored_pixel {
-                            self.screen_update_locations.push((x_coord + x, y_coord + y));
-                            log::info!("Pushed update to pos at [{}][{}]", x_coord + x, y_coord + y);
+                            self.pixels_to_redraw.push((x_coord + x, y_coord + y));
                         }
                         *old_pixel = xored_pixel; // Save xor'ed pixel
                     }
@@ -235,12 +251,17 @@ impl Emulator {
             }
 
             // TODO: Skip if the key in Vx is pressed
-            Instruction::IfKeyEqVx(Reg(_)) => {
+            Instruction::IfKeyEqVx(Reg(x)) => {
+                if keys_pressed[self.registers[x as usize] as usize] {
+                    self.program_counter += 2;
+                }
             }
 
             // TODO: Skip if the key in Vx isn't pressed
-            Instruction::IfKeyNeqVx(Reg(_)) => {
-                self.program_counter += 2;
+            Instruction::IfKeyNeqVx(Reg(x)) => {
+                if !keys_pressed[self.registers[x as usize] as usize] {
+                    self.program_counter += 2;
+                }
             }
 
             Instruction::SetRegToDelayTimer(Reg(x)) => {
@@ -249,7 +270,7 @@ impl Emulator {
 
             // Get a key press (blocking)
             Instruction::SetRegToGetKey(Reg(_)) => {
-                log::warn!("Unimplemented: SetRegToGetKey");
+                log::error!("Unimplemented: SetRegToGetKey");
             }
 
             Instruction::SetDelayTimerToReg(Reg(x)) => {
@@ -315,14 +336,14 @@ mod tests {
     fn clear_screen_clears_screen() {
         let mut emulator = Emulator::new();
         emulator.screen[0][0] = 1;
-        emulator.execute_single(Instruction::ClearScreen);
+        emulator.execute_single(Instruction::ClearScreen, [false; 0xF]);
         assert_eq!(emulator.screen[0][0], 0);
     }
 
     #[test]
     fn goto_goes_to() {
         let mut emulator = Emulator::new();
-        emulator.execute_single(Instruction::Goto(Addr(0x250)));
+        emulator.execute_single(Instruction::Goto(Addr(0x250)), [false; 0xF]);
         assert_eq!(emulator.program_counter, 0x250);
     }
 
@@ -342,9 +363,9 @@ mod tests {
         emulator.load(&program);
 
         // Run the program
-        emulator.step(); // Call 0x206
+        emulator.step([false; 0xF]); // Call 0x206
         assert_eq!(emulator.program_counter, 0x206);
-        emulator.step(); // Return to 202
+        emulator.step([false; 0xF]); // Return to 202
         assert_eq!(emulator.program_counter, 0x202);
     }
 }
