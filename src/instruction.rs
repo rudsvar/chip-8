@@ -84,6 +84,7 @@ impl Instruction {
             (5, x, y, 0) => Instruction::IfRegEqReg(Reg(x), Reg(y)),
             (6, x, _, _) => Instruction::SetRegToConst(Reg(x), Const(opcode.last_8_bits())),
             (7, x, _, _) => Instruction::IncRegByConst(Reg(x), Const(opcode.last_8_bits())),
+            (8, x, y, 0) => Instruction::SetRegToReg(Reg(x), Reg(y)),
             (8, x, y, 1) => Instruction::BitwiseOr(Reg(x), Reg(y)),
             (8, x, y, 2) => Instruction::BitwiseAnd(Reg(x), Reg(y)),
             (8, x, y, 3) => Instruction::BitwiseXor(Reg(x), Reg(y)),
@@ -134,6 +135,7 @@ mod tests {
         assert_eq!(Instruction::IfRegNeqConst(Reg(0xA), Const(8)), Instruction::from_u16(0x4A08));
         assert_eq!(Instruction::SetRegToConst(Reg(0xB), Const(0x23)), Instruction::from_u16(0x6B23));
         assert_eq!(Instruction::IncRegByConst(Reg(0xC), Const(0xA1)), Instruction::from_u16(0x7CA1));
+        assert_eq!(Instruction::SetRegToReg(Reg(0xA), Reg(0xB)), Instruction::from_u16(0x8AB0));
         assert_eq!(Instruction::BitwiseOr(Reg(0xD), Reg(0xE)), Instruction::from_u16(0x8DE1));
         assert_eq!(Instruction::BitwiseAnd(Reg(0xD), Reg(0xE)), Instruction::from_u16(0x8DE2));
         assert_eq!(Instruction::BitwiseXor(Reg(0xD), Reg(0xE)), Instruction::from_u16(0x8DE3));
