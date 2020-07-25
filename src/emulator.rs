@@ -1,13 +1,12 @@
 //! The CHIP-8 emulator as described at https://en.wikipedia.org/wiki/CHIP-8#Virtual_machine_description.
 
 use crate::instruction::*;
-use std::fmt;
 
 const MEM_SIZE: usize = 4096;
 const NUM_REGISTERS: usize = 16;
 const STACK_SIZE: usize = 256;
-const SCREEN_WIDTH: usize = 64;
-const SCREEN_HEIGHT: usize = 32;
+const SCREEN_WIDTH: usize = 128;
+const SCREEN_HEIGHT: usize = 64;
 type Screen = [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT];
 const EMPTY_SCREEN: Screen = [[0; SCREEN_WIDTH]; SCREEN_HEIGHT];
 const PC_START: u16 = 0x200;
@@ -21,20 +20,8 @@ pub struct Emulator {
     program_counter: u16,
     stack_pointer: u8,
     stack: [u16; STACK_SIZE],
-    screen: Screen
-}
-
-impl fmt::Display for Emulator {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for row in &self.screen {
-            for c in row.iter() {
-                write!(f, "{}", if *c == 1 { "# " } else { "  " })?;
-            }
-            writeln!(f)?;
-        }
-
-        Ok(())
-    }
+    screen: Screen,
+    screen_update_locations: Vec<(usize, usize)>
 }
 
 impl Emulator {
@@ -50,11 +37,22 @@ impl Emulator {
             program_counter: PC_START,
             stack_pointer: 0,
             stack: [0; STACK_SIZE],
-            screen: EMPTY_SCREEN
+            screen: EMPTY_SCREEN,
+            screen_update_locations: Vec::new()
         }
     }
 
-    /// Copy a program into memory
+    /// Get access to the entire game screen.
+    pub fn get_screen(&self) -> &Screen {
+        &self.screen
+    }
+
+    /// Get a list of all positions that have been updated during the previous step.
+    pub fn get_screen_update_locations(&self) -> &Vec<(usize, usize)> {
+        &self.screen_update_locations
+    }
+
+    /// Copy a program into memory at 0x200.
     pub fn load(&mut self, program: &[u8]) {
         for i in 0..std::cmp::min(program.len(), self.memory.len() - 0x200) {
             self.memory[self.program_counter as usize + i] = program[i];
@@ -80,6 +78,8 @@ impl Emulator {
         let instruction = Instruction::from_two_u8(left, right);
 
         log::trace!("{:?}", instruction);
+
+        self.screen_update_locations = Vec::new();
 
         self.program_counter += 2; // TODO: Make this more error resistant?
 
@@ -217,9 +217,14 @@ impl Emulator {
                         let new_pixel = (row >> (8 - x)) & 1; // Get bit number `bit_idx`
                         let old_pixel = &mut self.screen[y_coord + y][x_coord + x];
                         let xored_pixel = *old_pixel ^ new_pixel; // XOR old pixel with new pixel
+                        // Set pixel is unset
                         if *old_pixel == 1 && xored_pixel == 0 {
-                            // Set pixel is unset
                             any_collisions = 1;
+                        }
+                        // Store updated locations
+                        if *old_pixel != xored_pixel {
+                            self.screen_update_locations.push((x_coord + x, y_coord + y));
+                            log::info!("Pushed update to pos at [{}][{}]", x_coord + x, y_coord + y);
                         }
                         *old_pixel = xored_pixel; // Save xor'ed pixel
                     }
@@ -230,11 +235,11 @@ impl Emulator {
             }
 
             // TODO: Skip if the key in Vx is pressed
-            Instruction::IfKeyEqVx(Reg(x)) => {
+            Instruction::IfKeyEqVx(Reg(_)) => {
             }
 
             // TODO: Skip if the key in Vx isn't pressed
-            Instruction::IfKeyNeqVx(_) => {
+            Instruction::IfKeyNeqVx(Reg(_)) => {
                 self.program_counter += 2;
             }
 
@@ -243,7 +248,7 @@ impl Emulator {
             }
 
             // Get a key press (blocking)
-            Instruction::SetRegToGetKey(Reg(x)) => {
+            Instruction::SetRegToGetKey(Reg(_)) => {
                 log::warn!("Unimplemented: SetRegToGetKey");
             }
 
@@ -260,7 +265,7 @@ impl Emulator {
             }
 
             // TODO: Add font sprites?
-            Instruction::SetIToSpriteAddrVx(Reg(x)) => {
+            Instruction::SetIToSpriteAddrVx(Reg(_)) => {
                 log::warn!("Unimplemented: SetIToSpriteAddrVx");
             }
 

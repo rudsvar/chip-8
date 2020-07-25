@@ -6,7 +6,6 @@ use std::io::{Write, stdout};
 
 use log::LevelFilter;
 use log4rs::append::file::FileAppender;
-use log4rs::encode::pattern::PatternEncoder;
 use log4rs::config::{Appender, Config, Root};
 
 /// A basic example
@@ -46,17 +45,23 @@ fn main() -> std::io::Result<()> {
     log::info!("Executing {:?}", &opt.input);
     let program = std::fs::read(opt.input)?;
 
-    let mut screen = AlternateScreen::from(stdout());
-
     // Load instructions into emulator memory
     let mut emulator = Emulator::new();
     emulator.load(&program);
 
+    // Create alternate screen to draw on
+    let mut stdout = AlternateScreen::from(stdout());
+
+    write!(stdout, "{}", termion::cursor::Hide)?;
 
     // Start execution
     while emulator.step() {
-        write!(screen, "{}", termion::cursor::Goto(1,1))?;
-        write!(screen, "{}", emulator)?;
+        let screen = emulator.get_screen();
+        for &(x, y) in emulator.get_screen_update_locations() {
+            write!(stdout, "{}", termion::cursor::Goto(x as u16 + 1, y as u16 + 1))?;
+            write!(stdout, "{}", if screen[y][x] == 1 { "##" } else { "  " })?;
+        }
+        stdout.flush()?;
         std::thread::sleep(std::time::Duration::from_micros(1_000_000/60))
     }
 
