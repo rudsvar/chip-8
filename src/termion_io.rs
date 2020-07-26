@@ -1,57 +1,37 @@
 use crate::emulator::{Input, Output};
-use std::io::{Write, Stdout, stdout};
-use std::sync::{Arc, Mutex, mpsc};
-use std::time;
+use crate::key_manager::KeyManager;
 
+use std::io::{Write, Stdout, stdout};
+
+use termion::event::Key;
 use termion::raw::IntoRawMode;
 use termion::screen::AlternateScreen;
 
 const SCREEN_WIDTH: usize = 256;
 const SCREEN_HEIGHT: usize = SCREEN_WIDTH;
-const TIMEOUT: time::Duration = time::Duration::from_millis(250);
 
-pub struct TermionInput {
-    key: Arc<Mutex<Option<(u8, time::SystemTime)>>>, // Latest pressed key
-    waiting: Arc<Mutex<bool>>, // Wether we are waiting for a keypress or not
-    receiver: mpsc::Receiver<(u8, time::SystemTime)>, // Channel for receiving blocking keypresses
+pub struct TermionInput<'a> {
+    key_manager: &'a KeyManager
 }
 
-impl TermionInput {
-    pub fn new(key: Arc<Mutex<Option<(u8, time::SystemTime)>>>, waiting: Arc<Mutex<bool>>, receiver: mpsc::Receiver<(u8, time::SystemTime)>) -> TermionInput {
+impl TermionInput<'_> {
+    pub fn new(key_manager: &KeyManager) -> TermionInput{
         TermionInput {
-            key,
-            waiting,
-            receiver,
+            key_manager
         }
     }
 }
 
-impl Input for TermionInput {
+impl Input for TermionInput<'_> {
+    
     fn get_key(&self) -> Option<u8> {
-        match *self.key.lock().unwrap() {
-            Some((key, timestamp)) => {
-                if timestamp.elapsed().unwrap() < TIMEOUT {
-                    log::info!("Key pressed is {}", key);
-                    return Some(key);
-                }
-            },
-            _ => {}
-        }
-
-        None
+        let key = self.key_manager.get_key()?;
+        key_to_u8(key)
     }
+
     fn get_key_blocking(&self) -> u8 {
-        let mut waiting = self.waiting.lock().unwrap();
-        *waiting = true;
-        let mut result = 0;
-        for (key, timestamp) in self.receiver.recv() {
-            if timestamp.elapsed().unwrap() < TIMEOUT {
-                result = key;
-                break;
-            }
-        }
-        *waiting = false;
-        result
+        let key = self.key_manager.get_key_blocking();
+        key_to_u8(key).unwrap() // TODO: Add predicate -^
     }
 }
 
@@ -78,6 +58,7 @@ impl Drop for TermionOutput {
 }
 
 impl Output for TermionOutput {
+
     fn set(&mut self, x: usize, y: usize, state: u8) {
         let old_state = &mut self.cells[y][x];
         if *old_state != state {
@@ -87,14 +68,17 @@ impl Output for TermionOutput {
             self.screen.flush().unwrap();
         }
     }
+
     fn get(&self, x: usize, y: usize) -> u8 {
         self.cells[y][x]
     }
+
     fn clear(&mut self) {
         self.cells = [[0; SCREEN_WIDTH]; SCREEN_HEIGHT];
         write!(self.screen, "{}", termion::clear::All).unwrap();
         self.screen.flush().unwrap();
     }
+
     fn refresh(&mut self) {
         write!(self.screen, "{}", termion::cursor::Goto(1, 1)).unwrap();
         for row in self.cells.iter() {
@@ -104,5 +88,16 @@ impl Output for TermionOutput {
             writeln!(self.screen, "").unwrap();
         }
         self.screen.flush().unwrap();
+    }
+}
+
+fn key_to_u8(key: Key) -> Option<u8> {
+    match key {
+        Key::Char(c) => {
+            c.to_digit(10)
+                .filter(|c| *c <= 0xF)
+                .map(|c| c as u8)
+        }
+        _ => None
     }
 }

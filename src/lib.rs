@@ -2,3 +2,4 @@ pub mod emulator;
 pub mod instruction;
 pub mod bit_splitter;
 pub mod termion_io;
+pub mod key_manager;
