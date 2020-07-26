@@ -5,13 +5,41 @@ use crate::instruction::*;
 const MEM_SIZE: usize = 4096;
 const NUM_REGISTERS: usize = 16;
 const STACK_SIZE: usize = 256;
-const SCREEN_WIDTH: usize = 128;
-const SCREEN_HEIGHT: usize = 128;
-type Screen = [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT];
-const EMPTY_SCREEN: Screen = [[0; SCREEN_WIDTH]; SCREEN_HEIGHT];
+// const SCREEN_WIDTH: usize = 128;
+// const SCREEN_HEIGHT: usize = 128;
+// type Screen = [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT];
+// const EMPTY_SCREEN: Screen = [[0; SCREEN_WIDTH]; SCREEN_HEIGHT];
 const PC_START: u16 = 0x200;
 
-pub struct Emulator {
+pub trait Input {
+    fn get_key(&self) -> Option<u8>;
+    fn get_key_blocking(&self) -> u8;
+}
+
+pub struct DummyInput;
+
+impl Input for DummyInput {
+    fn get_key(&self) -> Option<u8> { None }
+    fn get_key_blocking(&self) -> u8 { unimplemented!("Can't get blocking") }
+}
+
+pub trait Output {
+    fn set(&mut self, x: usize, y: usize, state: u8);
+    fn get(&self, x: usize, y: usize) -> u8;
+    fn clear(&mut self);
+    fn refresh(&mut self);
+}
+
+pub struct DummyOutput;
+
+impl Output for DummyOutput {
+    fn set(&mut self, _: usize, _: usize, state: u8) {}
+    fn get(&self, _: usize, _: usize) -> u8 { 0 }
+    fn clear(&mut self) {}
+    fn refresh(&mut self) {}
+}
+
+pub struct Emulator<I: Input, O: Output> {
     // Standard fields
     memory: [u8; MEM_SIZE],
     registers: [u8; NUM_REGISTERS],
@@ -21,15 +49,15 @@ pub struct Emulator {
     program_counter: u16,
     stack_pointer: u8,
     stack: [u16; STACK_SIZE],
-    screen: Screen,
-    // Custom fields
-    pixels_to_redraw: Vec<(usize, usize)>
+
+    input: I,
+    output: O
 }
 
-impl Emulator {
+impl<I: Input, O: Output> Emulator<I, O> {
 
-    /// Create a new emulator
-    pub fn new() -> Emulator {
+    /// Create a new emulator with input and output
+    pub fn with_io(input: I, output: O) -> Emulator<I, O> {
         Emulator {
             memory: [0; MEM_SIZE],
             registers: [0; NUM_REGISTERS],
@@ -39,31 +67,15 @@ impl Emulator {
             program_counter: PC_START,
             stack_pointer: 0,
             stack: [0; STACK_SIZE],
-            screen: EMPTY_SCREEN,
-            pixels_to_redraw: Vec::new()
+            
+            input,
+            output
         }
     }
 
-    /// Get access to the entire game screen.
-    pub fn get_screen(&self) -> &Screen {
-        &self.screen
-    }
-
-    /// Get a list of all positions that have been updated during the previous step.
-    pub fn get_screen_update_locations(&self) -> &Vec<(usize, usize)> {
-        &self.pixels_to_redraw
-    }
-
-    /// Tell the screen to update all drawn pixels.
-    pub fn flag_all_pixels_for_redrawing(&mut self) {
-        self.pixels_to_redraw = Vec::new();
-        for y in 0..SCREEN_HEIGHT {
-            for x in 0..SCREEN_WIDTH {
-                if self.screen[y][x] == 1 {
-                    self.pixels_to_redraw.push((x,y));
-                }
-            }
-        }
+    /// Create a new emulator with dummy input and output
+    pub fn new() -> Emulator<DummyInput, DummyOutput> {
+        Emulator::with_io(DummyInput, DummyOutput)
     }
 
     /// Copy a program into memory at 0x200.
@@ -75,7 +87,7 @@ impl Emulator {
 
     /// Perform a single step, which will update timers,
     /// then load an instruction and execute it.
-    pub fn step(&mut self, keys_pressed: &[bool; 0xF]) -> bool {
+    pub fn step(&mut self) {
 
         // Update timers
         if self.delay_timer > 0 {
@@ -93,21 +105,18 @@ impl Emulator {
 
         log::trace!("{:?}", instruction);
 
-        self.pixels_to_redraw = Vec::new();
-
         self.program_counter += 2; // TODO: Make this more error resistant?
 
-        self.execute_single(instruction, keys_pressed)
+        self.execute_single(instruction);
     }
 
     /// Execute a single instruction
-    fn execute_single(&mut self, instruction: Instruction, keys_pressed: &[bool; 0xF]) -> bool {
+    fn execute_single(&mut self, instruction: Instruction) {
         match instruction {
 
             // Clear the screen
             Instruction::ClearScreen => {
-                self.flag_all_pixels_for_redrawing();
-                self.screen = EMPTY_SCREEN;
+                self.output.clear();
             },
 
             // Return to the previous call site via the stack.
@@ -232,17 +241,14 @@ impl Emulator {
                     let row: u8 = sprite_data[y];
                     for x in 0 .. 8 {
                         let new_pixel = (row >> (8 - x)) & 1; // Get bit number `bit_idx`
-                        let old_pixel = &mut self.screen[y_coord + y][x_coord + x];
-                        let xored_pixel = *old_pixel ^ new_pixel; // XOR old pixel with new pixel
-                        // Set pixel is unset
-                        if *old_pixel == 1 && xored_pixel == 0 {
+                        let old_pixel = self.output.get(x_coord + x, y_coord + y);
+                        let xored_pixel = old_pixel ^ new_pixel; // XOR old pixel with new pixel
+                        self.output.set(x_coord + x, y_coord + y, xored_pixel); // Save xor'ed pixel
+
+                        // Set pixel was unset, so we set the collision flag
+                        if old_pixel == 1 && xored_pixel == 0 {
                             any_collisions = 1;
                         }
-                        // Store updated locations
-                        if *old_pixel != xored_pixel {
-                            self.pixels_to_redraw.push((x_coord + x, y_coord + y));
-                        }
-                        *old_pixel = xored_pixel; // Save xor'ed pixel
                     }
                 }
 
@@ -252,14 +258,14 @@ impl Emulator {
 
             // TODO: Skip if the key in Vx is pressed
             Instruction::IfKeyEqVx(Reg(x)) => {
-                if keys_pressed[self.registers[x as usize] as usize] {
+                if self.input.get_key() == Some(self.registers[x as usize]) {
                     self.program_counter += 2;
                 }
             }
 
             // TODO: Skip if the key in Vx isn't pressed
             Instruction::IfKeyNeqVx(Reg(x)) => {
-                if !keys_pressed[self.registers[x as usize] as usize] {
+                if self.input.get_key() != Some(self.registers[x as usize]) {
                     self.program_counter += 2;
                 }
             }
@@ -269,8 +275,8 @@ impl Emulator {
             }
 
             // Get a key press (blocking)
-            Instruction::SetRegToGetKey(Reg(_)) => {
-                log::error!("Unimplemented: SetRegToGetKey");
+            Instruction::SetRegToGetKey(Reg(x)) => {
+                self.registers[x as usize] = self.input.get_key_blocking();
             }
 
             Instruction::SetDelayTimerToReg(Reg(x)) => {
@@ -288,6 +294,7 @@ impl Emulator {
             // TODO: Add font sprites?
             Instruction::SetIToSpriteAddrVx(Reg(_)) => {
                 log::warn!("Unimplemented: SetIToSpriteAddrVx");
+                self.i = 0x0; // Set to empty area
             }
 
             Instruction::SetIToBcdOfReg(Reg(x)) => {
@@ -322,8 +329,6 @@ impl Emulator {
                 }
             }
         };
-
-        true
     }
 }
 
@@ -336,14 +341,14 @@ mod tests {
     fn clear_screen_clears_screen() {
         let mut emulator = Emulator::new();
         emulator.screen[0][0] = 1;
-        emulator.execute_single(Instruction::ClearScreen, [false; 0xF]);
+        emulator.execute_single(Instruction::ClearScreen);
         assert_eq!(emulator.screen[0][0], 0);
     }
 
     #[test]
     fn goto_goes_to() {
         let mut emulator = Emulator::new();
-        emulator.execute_single(Instruction::Goto(Addr(0x250)), [false; 0xF]);
+        emulator.execute_single(Instruction::Goto(Addr(0x250)));
         assert_eq!(emulator.program_counter, 0x250);
     }
 
@@ -363,9 +368,9 @@ mod tests {
         emulator.load(&program);
 
         // Run the program
-        emulator.step([false; 0xF]); // Call 0x206
+        emulator.step(); // Call 0x206
         assert_eq!(emulator.program_counter, 0x206);
-        emulator.step([false; 0xF]); // Return to 202
+        emulator.step(); // Return to 202
         assert_eq!(emulator.program_counter, 0x202);
     }
 }
