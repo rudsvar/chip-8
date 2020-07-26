@@ -5,11 +5,25 @@ use crate::instruction::*;
 const MEM_SIZE: usize = 4096;
 const NUM_REGISTERS: usize = 16;
 const STACK_SIZE: usize = 256;
-// const SCREEN_WIDTH: usize = 128;
-// const SCREEN_HEIGHT: usize = 128;
-// type Screen = [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT];
-// const EMPTY_SCREEN: Screen = [[0; SCREEN_WIDTH]; SCREEN_HEIGHT];
 const PC_START: u16 = 0x200;
+const FONT: [u8; 80] = [
+	0xF0,0x90,0x90,0x90,0xF0, // 0
+	0x20,0x60,0x20,0x20,0x70, // 1
+	0xF0,0x10,0xF0,0x80,0xF0, // 2
+	0xF0,0x10,0xF0,0x10,0xF0, // 3
+	0x90,0x90,0xF0,0x10,0x10, // 4
+	0xF0,0x80,0xF0,0x10,0xF0, // 5
+	0xF0,0x80,0xF0,0x90,0xF0, // 6
+	0xF0,0x10,0x20,0x40,0x40, // 7
+	0xF0,0x90,0xF0,0x90,0xF0, // 8
+	0xF0,0x90,0xF0,0x10,0xF0, // 9
+	0xF0,0x90,0xF0,0x90,0x90, // A
+	0xE0,0x90,0xE0,0x90,0xE0, // B
+	0xF0,0x80,0x80,0x80,0xF0, // C
+	0xE0,0x90,0x90,0x90,0xE0, // D
+	0xF0,0x80,0xF0,0x80,0xF0, // E
+    0xF0,0x80,0xF0,0x80,0x80, // F
+];
 
 pub trait Input {
     fn get_key(&self) -> Option<u8>;
@@ -33,7 +47,7 @@ pub trait Output {
 pub struct DummyOutput;
 
 impl Output for DummyOutput {
-    fn set(&mut self, _: usize, _: usize, state: u8) {}
+    fn set(&mut self, _: usize, _: usize, _: u8) {}
     fn get(&self, _: usize, _: usize) -> u8 { 0 }
     fn clear(&mut self) {}
     fn refresh(&mut self) {}
@@ -58,8 +72,15 @@ impl<I: Input, O: Output> Emulator<I, O> {
 
     /// Create a new emulator with input and output
     pub fn with_io(input: I, output: O) -> Emulator<I, O> {
+        let mut memory = [0; MEM_SIZE];
+
+        // Load font
+        for i in 0 .. FONT.len() {
+            memory[i] = FONT[i];
+        }
+
         Emulator {
-            memory: [0; MEM_SIZE],
+            memory,
             registers: [0; NUM_REGISTERS],
             delay_timer: 0,
             sound_timer: 0,
@@ -162,7 +183,7 @@ impl<I: Input, O: Output> Emulator<I, O> {
 
             // Should this overflow?
             Instruction::IncRegByConst(Reg(x), Const(n)) => {
-                self.registers[x as usize] = self.registers[x as usize] + n;
+                self.registers[x as usize] = self.registers[x as usize].overflowing_add(n).0;
             }
 
             Instruction::SetRegToReg(Reg(x), Reg(y)) => {
@@ -184,13 +205,13 @@ impl<I: Input, O: Output> Emulator<I, O> {
             // Increment the value of a register by the value of another
             // TODO: Set VF to 1 if there is a carry, 0 otherwise.
             Instruction::IncRegByReg(Reg(x), Reg(y)) => {
-                self.registers[x as usize] += self.registers[y as usize];
+                self.registers[x as usize] = self.registers[x as usize].overflowing_add(self.registers[y as usize]).0;
             }
 
             // Decrement the value of a register by the value of another
             // TODO: Set VF to 0 if there is a borrow, 1 otherwise.
             Instruction::DecRegByReg(Reg(x), Reg(y)) => {
-                self.registers[x as usize] -= self.registers[y as usize];
+                self.registers[x as usize] = self.registers[x as usize].overflowing_sub(self.registers[y as usize]).0;
             }
 
             Instruction::BitshiftRight(Reg(x)) => {
@@ -240,7 +261,7 @@ impl<I: Input, O: Output> Emulator<I, O> {
                 for y in 0 .. sprite_height as usize {
                     let row: u8 = sprite_data[y];
                     for x in 0 .. 8 {
-                        let new_pixel = (row >> (8 - x)) & 1; // Get bit number `bit_idx`
+                        let new_pixel = row >> (7 - x) & 1; // Get bit number `bit_idx`
                         let old_pixel = self.output.get(x_coord + x, y_coord + y);
                         let xored_pixel = old_pixel ^ new_pixel; // XOR old pixel with new pixel
                         self.output.set(x_coord + x, y_coord + y, xored_pixel); // Save xor'ed pixel
@@ -291,10 +312,9 @@ impl<I: Input, O: Output> Emulator<I, O> {
                 self.i += self.registers[x as usize] as u16;
             }
 
-            // TODO: Add font sprites?
-            Instruction::SetIToSpriteAddrVx(Reg(_)) => {
-                log::warn!("Unimplemented: SetIToSpriteAddrVx");
-                self.i = 0x0; // Set to empty area
+            // Set i to character address. Each font element is 5 bytes wide.
+            Instruction::SetIToSpriteAddrVx(Reg(x)) => {
+                self.i = 5 * self.registers[x as usize] as u16;
             }
 
             Instruction::SetIToBcdOfReg(Reg(x)) => {
@@ -338,16 +358,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn clear_screen_clears_screen() {
-        let mut emulator = Emulator::new();
-        emulator.screen[0][0] = 1;
-        emulator.execute_single(Instruction::ClearScreen);
-        assert_eq!(emulator.screen[0][0], 0);
-    }
-
-    #[test]
     fn goto_goes_to() {
-        let mut emulator = Emulator::new();
+        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
         emulator.execute_single(Instruction::Goto(Addr(0x250)));
         assert_eq!(emulator.program_counter, 0x250);
     }
@@ -355,7 +367,7 @@ mod tests {
     #[test]
     fn return_after_call_is_neutral() {
         // Create emulator
-        let mut emulator = Emulator::new();
+        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
         assert_eq!(emulator.program_counter, 0x200);
 
         // Write program with call and return

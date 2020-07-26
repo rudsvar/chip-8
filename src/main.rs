@@ -1,16 +1,15 @@
 use std::path::PathBuf;
-use structopt::StructOpt;
-use chip_8::emulator::Emulator;
-use chip_8::emulator::{Input, Output};
-use std::io::{Write, stdout, Stdout};
 use std::thread;
-use std::sync::{Arc, Mutex, mpsc};
 use std::time;
+use std::sync::{Arc, Mutex, mpsc};
 
-use termion::screen::AlternateScreen;
+use structopt::StructOpt;
+
+use chip_8::emulator::Emulator;
+use chip_8::termion_io::{TermionInput, TermionOutput};
+
 use termion::event::Key;
 use termion::input::TermRead;
-use termion::raw::IntoRawMode;
 
 use log::LevelFilter;
 use log4rs::append::file::FileAppender;
@@ -30,97 +29,6 @@ struct Opt {
     /// Files to process
     #[structopt(parse(from_os_str))]
     input: PathBuf,
-}
-
-struct TermionInput {
-    key: Arc<Mutex<Option<(u8, time::SystemTime)>>>, // Latest pressed key
-    waiting: Arc<Mutex<bool>>, // Wether we are waiting for a keypress or not
-    receiver: mpsc::Receiver<(u8, time::SystemTime)>, // Channel for receiving blocking keypresses
-}
-
-impl TermionInput {
-    fn new(key: Arc<Mutex<Option<(u8, time::SystemTime)>>>, waiting: Arc<Mutex<bool>>, receiver: mpsc::Receiver<(u8, time::SystemTime)>) -> TermionInput {
-        TermionInput {
-            key,
-            waiting,
-            receiver,
-        }
-    }
-}
-
-impl Input for TermionInput {
-    fn get_key(&self) -> Option<u8> {
-        match *self.key.lock().unwrap() {
-            Some((key, timestamp)) => {
-                if timestamp.elapsed().unwrap() < time::Duration::from_millis(250) {
-                    log::info!("Key pressed is {}", key);
-                    return Some(key);
-                }
-            },
-            _ => {}
-        }
-
-        None
-    }
-    fn get_key_blocking(&self) -> u8 {
-        let mut waiting = self.waiting.lock().unwrap();
-        *waiting = true;
-        let mut result = 0;
-        for (key, timestamp) in self.receiver.recv() {
-            if timestamp.elapsed().unwrap() < time::Duration::from_millis(250) {
-                result = key;
-                break;
-            }
-        }
-        *waiting = false;
-        result
-    }
-}
-
-struct TermionOutput {
-    screen: AlternateScreen<termion::raw::RawTerminal<Stdout>>,
-    cells: [[u8; 128]; 128]
-}
-
-impl TermionOutput {
-    fn new() -> TermionOutput {
-        let mut screen = AlternateScreen::from(stdout().into_raw_mode().unwrap());
-        write!(screen, "{}", termion::cursor::Hide).unwrap();
-        TermionOutput {
-            screen,
-            cells: [[0; 128]; 128]
-        }
-    }
-}
-
-impl Output for TermionOutput {
-    fn set(&mut self, x: usize, y: usize, state: u8) {
-        let old_state = &mut self.cells[y][x];
-        if *old_state != state {
-            *old_state = state;
-            write!(self.screen, "{}", termion::cursor::Goto(2 * x as u16 + 1, y as u16 + 1)).unwrap();
-            write!(self.screen, "{}", if state == 1 { "##" } else { "  " }).unwrap();
-            self.screen.flush().unwrap();
-        }
-    }
-    fn get(&self, x: usize, y: usize) -> u8 {
-        self.cells[y][x]
-    }
-    fn clear(&mut self) {
-        self.cells = [[0; 128]; 128];
-        write!(self.screen, "{}", termion::clear::All).unwrap();
-        self.screen.flush().unwrap();
-    }
-    fn refresh(&mut self) {
-        write!(self.screen, "{}", termion::cursor::Goto(1, 1)).unwrap();
-        for row in self.cells.iter() {
-            for cell in row.iter() {
-                write!(self.screen, "{}", if *cell == 1 { "##" } else { "  " } ).unwrap();
-            }
-            writeln!(self.screen, "").unwrap();
-        }
-        self.screen.flush().unwrap();
-    }
 }
 
 fn event_listener(sender: mpsc::Sender<(u8, time::SystemTime)>, key_pressed: Arc<Mutex<Option<(u8, time::SystemTime)>>>, waiting: Arc<Mutex<bool>>, stop: Arc<Mutex<bool>>) -> thread::JoinHandle<()> {
