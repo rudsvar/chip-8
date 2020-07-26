@@ -1,6 +1,6 @@
 //! The CHIP-8 emulator as described at https://en.wikipedia.org/wiki/CHIP-8#Virtual_machine_description.
 
-use crate::instruction::*;
+use crate::emulator::instruction::*;
 
 const MEM_SIZE: usize = 4096;
 const NUM_REGISTERS: usize = 16;

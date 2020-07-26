@@ -1,4 +1,4 @@
-use crate::bit_splitter::BitSplitter;
+use crate::util::bit_splitter::BitSplitter;
 
 /// A wrapper for addresses.
 #[derive(Debug, PartialEq, Eq)]

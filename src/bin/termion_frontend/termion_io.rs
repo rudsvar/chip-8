@@ -1,5 +1,5 @@
-use crate::emulator::{Input, Output};
-use crate::key_manager::KeyManager;
+use chip_8::emulator::emulator::{Input, Output};
+use chip_8::emulator::key_manager::KeyManager;
 
 use std::io::{Write, Stdout, stdout};
 

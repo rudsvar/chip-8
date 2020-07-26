@@ -2,8 +2,11 @@ use std::path::PathBuf;
 
 use structopt::StructOpt;
 
-use chip_8::emulator::Emulator;
-use chip_8::termion_io::{TermionInput, TermionOutput};
+use chip_8::emulator::emulator::Emulator;
+use chip_8::emulator::key_manager::KeyManager;
+
+mod termion_io;
+use termion_io::{TermionInput, TermionOutput};
 
 use termion::event::Key;
 
@@ -47,7 +50,7 @@ fn main() -> std::io::Result<()> {
     log::info!("Executing {:?}", &opt.input);
     let program = std::fs::read(opt.input)?;
 
-    let key_manager = chip_8::key_manager::KeyManager::new();
+    let key_manager = KeyManager::new();
 
     // Load instructions into emulator memory
     let mut emulator = Emulator::with_io(
