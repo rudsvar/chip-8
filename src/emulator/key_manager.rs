@@ -61,6 +61,31 @@ impl KeyManager {
         for (key, timestamp) in self.receiver.iter() {
             if timestamp.elapsed().unwrap() < TIMEOUT {
                 received_key = key;
+                break;
+            }
+        }
+        // Tell the listener that we are done waiting
+        guard.waiting_for_key = false;
+        received_key
+    }
+
+    // Get a key by blocking, but only the keys 0 - 0xF
+    pub fn get_key_blocking_u8(&self) -> u8 {
+        let mut guard = self.shared_data.lock().unwrap();
+        // Tell the listener that we are waiting
+        guard.waiting_for_key = true;
+        let mut received_key = 0;
+        // Find a fresh keypress
+        for (key, timestamp) in self.receiver.iter() {
+            if timestamp.elapsed().unwrap() < TIMEOUT {
+                if let Key::Char(c) = key {
+                    if ('0'..'9').contains(&c) || ('a'..'f').contains(&c) {
+                        if let Some(i) = c.to_digit(10) {
+                            received_key = i as u8;
+                            break;
+                        }
+                    }
+                }
             }
         }
         // Tell the listener that we are done waiting

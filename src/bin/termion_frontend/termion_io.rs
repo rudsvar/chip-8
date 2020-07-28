@@ -30,8 +30,7 @@ impl Input for TermionInput<'_> {
     }
 
     fn get_key_blocking(&self) -> u8 {
-        let key = self.key_manager.get_key_blocking();
-        key_to_u8(key).unwrap() // TODO: Add predicate -^
+        self.key_manager.get_key_blocking_u8()
     }
 }
 
