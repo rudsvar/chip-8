@@ -7,8 +7,8 @@ use termion::event::Key;
 use termion::raw::IntoRawMode;
 use termion::screen::AlternateScreen;
 
-const SCREEN_WIDTH: usize = 256;
-const SCREEN_HEIGHT: usize = SCREEN_WIDTH;
+const SCREEN_WIDTH: usize = 128;
+const SCREEN_HEIGHT: usize = 64;
 
 pub struct TermionInput<'a> {
     key_manager: &'a KeyManager
@@ -43,10 +43,39 @@ impl TermionOutput {
     pub fn new() -> TermionOutput {
         let mut screen = AlternateScreen::from(stdout().into_raw_mode().unwrap());
         write!(screen, "{}", termion::cursor::Hide).unwrap();
+        let bottom = SCREEN_HEIGHT+2;
+        let right = SCREEN_WIDTH+2;
+        for y in 1..=bottom {
+            for x in 1..=right {
+                if y == 1 || y == bottom || x == 1 || x == right {
+                    let c = if y == 1 && x == 1 {
+                        '┏'
+                    } else if y == 1 && x == right {
+                        '┓'
+                    } else if y == bottom && x == 1 {
+                        '┗'
+                    } else if y == bottom && x == right {
+                        '┛'
+                    } else if y == 1 || y == bottom {
+                        '━'
+                    } else if x == 1 || x == right {
+                        '┃'
+                    } else {
+                        'X'
+                    };
+                    write!(screen, "{}{}", termion::cursor::Goto(x as u16, y as u16), c).unwrap();
+                }
+            }
+        }
         TermionOutput {
             screen,
             cells: [[0; SCREEN_WIDTH]; SCREEN_HEIGHT]
         }
+    }
+
+    fn draw(&mut self, x: usize, y: usize, state: u8) {
+        write!(self.screen, "{}", termion::cursor::Goto(2 * x as u16 + 2, y as u16 + 2)).unwrap();
+        write!(self.screen, "{}", if state == 1 { "██" } else { "  " }).unwrap();
     }
 }
 
@@ -62,8 +91,7 @@ impl Output for TermionOutput {
         let old_state = &mut self.cells[y][x];
         if *old_state != state {
             *old_state = state;
-            write!(self.screen, "{}", termion::cursor::Goto(2 * x as u16 + 1, y as u16 + 1)).unwrap();
-            write!(self.screen, "{}", if state == 1 { "██" } else { "  " }).unwrap();
+            self.draw(x, y, state);
             self.screen.flush().unwrap();
         }
     }
@@ -80,11 +108,10 @@ impl Output for TermionOutput {
 
     fn refresh(&mut self) {
         write!(self.screen, "{}", termion::cursor::Goto(1, 1)).unwrap();
-        for row in self.cells.iter() {
-            for cell in row.iter() {
-                write!(self.screen, "{}", if *cell == 1 { "██" } else { "  " } ).unwrap();
+        for y in 0..SCREEN_HEIGHT {
+            for x in 0..SCREEN_WIDTH {
+                self.draw(x, y, self.cells[y][x]);
             }
-            writeln!(self.screen, "").unwrap();
         }
         self.screen.flush().unwrap();
     }
