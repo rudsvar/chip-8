@@ -1,9 +1,10 @@
 use chip_8::emulator::emulator::{Input, Output};
-use chip_8::emulator::key_manager::KeyManager;
+
+use super::key_manager::KeyManager;
 
 use std::io::{stdout, Write};
 use crossterm::{execute, cursor};
-use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen, Clear, ClearType};
+use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen, Clear, ClearType};
 use crossterm::event::KeyCode;
 
 const SCREEN_WIDTH: usize = 128;
@@ -41,7 +42,7 @@ impl CrosstermOutput {
     pub fn new() -> CrosstermOutput {
         execute!(stdout(), EnterAlternateScreen);
         execute!(stdout(), cursor::Hide);
-        crossterm::terminal::enable_raw_mode();
+        terminal::enable_raw_mode();
         let bottom = SCREEN_HEIGHT+2;
         let right = SCREEN_WIDTH+2;
         for y in 1..=bottom {
@@ -80,7 +81,7 @@ impl CrosstermOutput {
 
 impl Drop for CrosstermOutput {
     fn drop(&mut self) {
-        crossterm::terminal::disable_raw_mode();
+        terminal::disable_raw_mode();
         execute!(stdout(), LeaveAlternateScreen);
         execute!(stdout(), cursor::Show);
     }

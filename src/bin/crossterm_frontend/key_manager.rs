@@ -45,19 +45,16 @@ impl KeyManager {
 
     // Get the currently pressed key if one exists
     pub fn get_key(&self) -> Option<KeyCode> {
-        log::info!("get_key");
         let key_pressed = self.shared_data.lock().unwrap().key_pressed;
-        log::info!("get_key before filter = {:?}", key_pressed);
         let res = key_pressed
             .filter(|(_, timestamp)| timestamp.elapsed().unwrap() < TIMEOUT)
             .map(|(key, _)| key);
-        log::info!("get_key res = {:?}", res);
         res
     }
 
     // Tell the event listener to send the next key here
     pub fn get_key_blocking(&self) -> KeyCode {
-        log::info!("get_key_blocking");
+        log::info!("Waiting for keypress");
         let mut guard = self.shared_data.lock().unwrap();
         // Tell the listener that we are waiting
         guard.waiting_for_key = true;
@@ -76,7 +73,7 @@ impl KeyManager {
 
     // Get a key by blocking, but only the keys 0 - 0xF
     pub fn get_key_blocking_u8(&self) -> u8 {
-        log::info!("get_key_blocking_u8");
+        log::info!("Waiting for keypress");
         let mut guard = self.shared_data.lock().unwrap();
         // Tell the listener that we are waiting
         guard.waiting_for_key = true;

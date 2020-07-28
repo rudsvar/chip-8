@@ -3,10 +3,13 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 
 use chip_8::emulator::emulator::Emulator;
-use chip_8::emulator::key_manager::KeyManager;
+
+mod key_manager;
+use key_manager::KeyManager;
 
 mod crossterm_io;
 use crossterm_io::{CrosstermInput, CrosstermOutput};
+
 use crossterm::event::KeyCode;
 
 /// The program options.
