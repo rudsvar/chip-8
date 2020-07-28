@@ -52,7 +52,7 @@ impl TermionOutput {
 
 impl Drop for TermionOutput {
     fn drop(&mut self) {
-        write!(self.screen, "{}", termion::cursor::Hide).unwrap();
+        write!(self.screen, "{}", termion::cursor::Show).unwrap();
     }
 }
 
