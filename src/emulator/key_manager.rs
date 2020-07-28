@@ -2,13 +2,12 @@ use std::thread::{self, JoinHandle};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 use std::sync::mpsc::{channel, Sender, Receiver};
-use termion::event::Key;
-use termion::input::TermRead;
+use crossterm::event::{read, KeyCode, Event};
 
 const TIMEOUT: Duration = Duration::from_millis(250);
 
 struct SharedData {
-    key_pressed: Option<(Key, SystemTime)>,
+    key_pressed: Option<(KeyCode, SystemTime)>,
     stop: bool,
     waiting_for_key: bool,
 }
@@ -25,7 +24,7 @@ impl SharedData {
 
 pub struct KeyManager {
     shared_data: Arc<Mutex<SharedData>>,
-    receiver: Receiver<(Key, SystemTime)>,
+    receiver: Receiver<(KeyCode, SystemTime)>,
     event_listener: JoinHandle<()>,
 }
 
@@ -33,6 +32,7 @@ impl KeyManager {
     
     // Start even listener thread
     pub fn new() -> KeyManager {
+        log::info!("Created KeyManager");
         let (sender, receiver) = channel();
         let shared_data = Arc::new(Mutex::new(SharedData::new()));
         let event_listener = event_listener(sender, shared_data.clone());
@@ -44,19 +44,24 @@ impl KeyManager {
     }
 
     // Get the currently pressed key if one exists
-    pub fn get_key(&self) -> Option<Key> {
+    pub fn get_key(&self) -> Option<KeyCode> {
+        log::info!("get_key");
         let key_pressed = self.shared_data.lock().unwrap().key_pressed;
-        key_pressed
-            .filter(|(_, timestamp)| timestamp.elapsed().unwrap() < TIMEOUT )
-            .map(|(key, _)| key)
+        log::info!("get_key before filter = {:?}", key_pressed);
+        let res = key_pressed
+            .filter(|(_, timestamp)| timestamp.elapsed().unwrap() < TIMEOUT)
+            .map(|(key, _)| key);
+        log::info!("get_key res = {:?}", res);
+        res
     }
 
     // Tell the event listener to send the next key here
-    pub fn get_key_blocking(&self) -> Key {
+    pub fn get_key_blocking(&self) -> KeyCode {
+        log::info!("get_key_blocking");
         let mut guard = self.shared_data.lock().unwrap();
         // Tell the listener that we are waiting
         guard.waiting_for_key = true;
-        let mut received_key = Key::Null;
+        let mut received_key = KeyCode::Null;
         // Find a fresh keypress
         for (key, timestamp) in self.receiver.iter() {
             if timestamp.elapsed().unwrap() < TIMEOUT {
@@ -71,6 +76,7 @@ impl KeyManager {
 
     // Get a key by blocking, but only the keys 0 - 0xF
     pub fn get_key_blocking_u8(&self) -> u8 {
+        log::info!("get_key_blocking_u8");
         let mut guard = self.shared_data.lock().unwrap();
         // Tell the listener that we are waiting
         guard.waiting_for_key = true;
@@ -78,7 +84,7 @@ impl KeyManager {
         // Find a fresh keypress
         for (key, timestamp) in self.receiver.iter() {
             if timestamp.elapsed().unwrap() < TIMEOUT {
-                if let Key::Char(c) = key {
+                if let KeyCode::Char(c) = key {
                     if ('0'..'9').contains(&c) || ('a'..'f').contains(&c) {
                         if let Some(i) = c.to_digit(10) {
                             received_key = i as u8;
@@ -102,10 +108,10 @@ impl Drop for KeyManager {
     }
 }
 
-fn event_listener(sender: Sender<(Key, SystemTime)>, shared_data: Arc<Mutex<SharedData>>) -> JoinHandle<()> {
+fn event_listener(sender: Sender<(KeyCode, SystemTime)>, shared_data: Arc<Mutex<SharedData>>) -> JoinHandle<()> {
     thread::spawn(move || {
-        let stdin = std::io::stdin();
-        for event in stdin.keys() {
+        loop {
+            let event = read().unwrap();
 
             // Check the shared data, and possibly stop
             let mut shared_data = shared_data.lock().unwrap();
@@ -113,11 +119,11 @@ fn event_listener(sender: Sender<(Key, SystemTime)>, shared_data: Arc<Mutex<Shar
                 break;
             }
 
-            // Investiage the event
+            // Investigate the event
             match event {
-                Ok(key) => {
-                    // Either send it 
-                    let key_with_timestamp = (key, SystemTime::now());
+                Event::Key(key_event) => {
+                    // Either send it to someone waiting, or set it as the last pressed key
+                    let key_with_timestamp = (key_event.code, SystemTime::now());
                     if shared_data.waiting_for_key {
                         sender.send(key_with_timestamp).expect("Could not send via channel");
                     } else {

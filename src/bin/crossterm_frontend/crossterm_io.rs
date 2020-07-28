@@ -1,28 +1,27 @@
 use chip_8::emulator::emulator::{Input, Output};
 use chip_8::emulator::key_manager::KeyManager;
 
-use std::io::{Write, Stdout, stdout};
-
-use termion::event::Key;
-use termion::raw::IntoRawMode;
-use termion::screen::AlternateScreen;
+use std::io::{stdout, Write};
+use crossterm::{execute, cursor};
+use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen, Clear, ClearType};
+use crossterm::event::KeyCode;
 
 const SCREEN_WIDTH: usize = 128;
 const SCREEN_HEIGHT: usize = 64;
 
-pub struct TermionInput<'a> {
+pub struct CrosstermInput<'a> {
     key_manager: &'a KeyManager
 }
 
-impl TermionInput<'_> {
-    pub fn new(key_manager: &KeyManager) -> TermionInput{
-        TermionInput {
+impl CrosstermInput<'_> {
+    pub fn new(key_manager: &KeyManager) -> CrosstermInput{
+        CrosstermInput {
             key_manager
         }
     }
 }
 
-impl Input for TermionInput<'_> {
+impl Input for CrosstermInput<'_> {
     
     fn get_key(&self) -> Option<u8> {
         let key = self.key_manager.get_key()?;
@@ -34,15 +33,15 @@ impl Input for TermionInput<'_> {
     }
 }
 
-pub struct TermionOutput {
-    screen: AlternateScreen<termion::raw::RawTerminal<Stdout>>,
+pub struct CrosstermOutput {
     cells: [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT]
 }
 
-impl TermionOutput {
-    pub fn new() -> TermionOutput {
-        let mut screen = AlternateScreen::from(stdout().into_raw_mode().unwrap());
-        write!(screen, "{}", termion::cursor::Hide).unwrap();
+impl CrosstermOutput {
+    pub fn new() -> CrosstermOutput {
+        execute!(stdout(), EnterAlternateScreen);
+        execute!(stdout(), cursor::Hide);
+        crossterm::terminal::enable_raw_mode();
         let bottom = SCREEN_HEIGHT+2;
         let right = SCREEN_WIDTH+2;
         for y in 1..=bottom {
@@ -63,36 +62,38 @@ impl TermionOutput {
                     } else {
                         'X'
                     };
-                    write!(screen, "{}{}", termion::cursor::Goto(x as u16, y as u16), c).unwrap();
+                    execute!(stdout(), cursor::MoveTo(x as u16, y as u16));
+                    write!(stdout(), "{}", c).unwrap();
                 }
             }
         }
-        TermionOutput {
-            screen,
+        CrosstermOutput {
             cells: [[0; SCREEN_WIDTH]; SCREEN_HEIGHT]
         }
     }
 
     fn draw(&mut self, x: usize, y: usize, state: u8) {
-        write!(self.screen, "{}", termion::cursor::Goto(2 * x as u16 + 2, y as u16 + 2)).unwrap();
-        write!(self.screen, "{}", if state == 1 { "██" } else { "  " }).unwrap();
+        execute!(stdout(), cursor::MoveTo(2 * x as u16 + 2, y as u16 + 2));
+        write!(stdout(), "{}", if state == 1 { "██" } else { "  " }).unwrap();
     }
 }
 
-impl Drop for TermionOutput {
+impl Drop for CrosstermOutput {
     fn drop(&mut self) {
-        write!(self.screen, "{}", termion::cursor::Show).unwrap();
+        crossterm::terminal::disable_raw_mode();
+        execute!(stdout(), LeaveAlternateScreen);
+        execute!(stdout(), cursor::Show);
     }
 }
 
-impl Output for TermionOutput {
+impl Output for CrosstermOutput {
 
     fn set(&mut self, x: usize, y: usize, state: u8) {
         let old_state = &mut self.cells[y][x];
         if *old_state != state {
             *old_state = state;
             self.draw(x, y, state);
-            self.screen.flush().unwrap();
+            stdout().flush();
         }
     }
 
@@ -102,24 +103,24 @@ impl Output for TermionOutput {
 
     fn clear(&mut self) {
         self.cells = [[0; SCREEN_WIDTH]; SCREEN_HEIGHT];
-        write!(self.screen, "{}", termion::clear::All).unwrap();
-        self.screen.flush().unwrap();
+        execute!(stdout(), Clear(ClearType::All));
+        stdout().flush();
     }
 
     fn refresh(&mut self) {
-        write!(self.screen, "{}", termion::cursor::Goto(1, 1)).unwrap();
+        execute!(stdout(), cursor::MoveTo(1,1));
         for y in 0..SCREEN_HEIGHT {
             for x in 0..SCREEN_WIDTH {
                 self.draw(x, y, self.cells[y][x]);
             }
         }
-        self.screen.flush().unwrap();
+        stdout().flush();
     }
 }
 
-fn key_to_u8(key: Key) -> Option<u8> {
+fn key_to_u8(key: KeyCode) -> Option<u8> {
     match key {
-        Key::Char(c) => {
+        KeyCode::Char(c) => {
             c.to_digit(10)
                 .filter(|c| *c <= 0xF)
                 .map(|c| c as u8)
