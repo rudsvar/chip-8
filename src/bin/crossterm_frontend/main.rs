@@ -4,6 +4,8 @@ use structopt::StructOpt;
 
 use chip_8::emulator::emulator::Emulator;
 
+mod key_buffer;
+
 mod key_manager;
 use key_manager::KeyManager;
 
