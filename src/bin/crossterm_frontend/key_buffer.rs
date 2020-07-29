@@ -25,11 +25,31 @@ impl KeyBuffer {
         }
     }
 
+    // Filter out old keypresses
+    fn clean(&self) {
+        let mut buffer_guard = self.buffer.lock().unwrap();
+        // Filter out old values
+        *buffer_guard = buffer_guard.iter()
+            .filter(|(_, ts)| ts.elapsed().unwrap() < self.timeout)
+            .map(|(a, b)| (*a, *b))
+            .collect();
+    }
+
     /// Push a new keypress to the buffer.
     pub fn push(&self, key_code: KeyCode) {
-        let mut guard = self.buffer.lock().unwrap();
-        guard.push_back((key_code, SystemTime::now()));
+        self.clean();
+        self.buffer.lock().unwrap()
+            .push_back((key_code, SystemTime::now()));
         self.condvar.notify_one();
+    }
+
+    /// Peek at the current keypress
+    pub fn peek(&self) -> Option<KeyCode> {
+        self.clean();
+        // Select the keycode component
+        self.buffer.lock().unwrap()
+            .front()
+            .map(|(kc, _)| *kc)
     }
 
     /// Pop a keypress from the buffer if a fresh enough one exists.

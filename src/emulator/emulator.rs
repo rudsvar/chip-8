@@ -277,14 +277,14 @@ impl<I: Input, O: Output> Emulator<I, O> {
                 self.registers[0xF] = any_collisions;
             }
 
-            // TODO: Skip if the key in Vx is pressed
+            // Skip if the key in Vx is pressed
             Instruction::IfKeyEqVx(Reg(x)) => {
                 if self.input.get_key() == Some(self.registers[x as usize]) {
                     self.program_counter += 2;
                 }
             }
 
-            // TODO: Skip if the key in Vx isn't pressed
+            // Skip if the key in Vx isn't pressed
             Instruction::IfKeyNeqVx(Reg(x)) => {
                 if self.input.get_key() != Some(self.registers[x as usize]) {
                     self.program_counter += 2;

@@ -35,7 +35,7 @@ fn main() -> std::io::Result<()> {
 
     // Load instructions into emulator memory
     let mut emulator = Emulator::with_io(
-        CrosstermInput::new(&key_manager), 
+        CrosstermInput::new(&key_manager),
         CrosstermOutput::new()
     );
     emulator.load(&program);
