@@ -1,15 +1,15 @@
 use crate::util::bit_splitter::BitSplitter;
 
 /// A wrapper for addresses.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub struct Addr(pub u16);
 
 /// A wrapper for registers.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub struct Reg(pub u8);
 
 /// A wrapper for constants.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub struct Const(pub u8);
 
 /// A single instruction from the CHIP-8 instruction set.
@@ -21,42 +21,76 @@ pub struct Const(pub u8);
 /// - PC: Program counter
 /// - I: 16 bit register for memory address
 /// - VN: One of the 16 available variables (register identifiers)
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum Instruction {
-    ClearScreen, // 00E0
-    Return, // 00EE
-    Goto(Addr), // 1NNN
-    Call(Addr), // 2NNN
-    IfRegEqConst(Reg, Const), // 3XNN
-    IfRegNeqConst(Reg, Const), // 4XNN
-    IfRegEqReg(Reg, Reg), // 5XY0
-    SetRegToConst(Reg, Const), // 6XNN
-    IncRegByConst(Reg, Const), // 7XNN
-    SetRegToReg(Reg, Reg), // 8XY0
-    BitwiseOr(Reg, Reg), // 8XY1
-    BitwiseAnd(Reg, Reg), // 8XY2
-    BitwiseXor(Reg, Reg), // 8XY3
-    IncRegByReg(Reg, Reg), // 8XY4
-    DecRegByReg(Reg, Reg), // 8XY5
-    BitshiftRight(Reg), // 8XY6
-    SetVxVyMinusVx(Reg, Reg), // 8XY7
-    BitshiftLeft(Reg), // 8XYE
-    IfRegNeqReg(Reg, Reg), // 9XY0
-    SetI(Addr), // ANNN
-    SetPcToV0PlusAddr(Addr), // BNNN
-    SetVxRand(Reg, Const), // CXNN
-    Draw(Reg, Reg, Const), // DXYN
-    IfKeyEqVx(Reg), // EX9E
-    IfKeyNeqVx(Reg), // EXA1
-    SetRegToDelayTimer(Reg), // FX07
-    SetRegToGetKey(Reg), // FX0A
-    SetDelayTimerToReg(Reg), // FX15
-    SetSoundTimerToReg(Reg), // FX18
-    AddRegToI(Reg), // FX1E
-    SetIToSpriteAddrVx(Reg), // FX29
-    SetIToBcdOfReg(Reg), // FX33
-    RegDump(Reg), // FX55
-    RegLoad(Reg) // FX65
+    /// 00E0
+    ClearScreen,
+    /// 00EE
+    Return,
+    /// 1NNN
+    Goto(Addr),
+    /// 2NNN
+    Call(Addr),
+    /// 3XNN
+    IfRegEqConst(Reg, Const),
+    /// 4XNN
+    IfRegNeqConst(Reg, Const),
+    /// 5XY0
+    IfRegEqReg(Reg, Reg),
+    /// 6XNN
+    SetRegToConst(Reg, Const),
+    /// 7XNN
+    IncRegByConst(Reg, Const),
+    /// 8XY0
+    SetRegToReg(Reg, Reg),
+    /// 8XY1
+    BitwiseOr(Reg, Reg),
+    /// 8XY2
+    BitwiseAnd(Reg, Reg),
+    /// 8XY3
+    BitwiseXor(Reg, Reg),
+    /// 8XY4
+    IncRegByReg(Reg, Reg),
+    /// 8XY5
+    DecRegByReg(Reg, Reg),
+    /// 8XY6
+    BitshiftRight(Reg),
+    /// 8XY7
+    SetVxVyMinusVx(Reg, Reg),
+    /// 8XYE
+    BitshiftLeft(Reg),
+    /// 9XY0
+    IfRegNeqReg(Reg, Reg),
+    /// ANNN
+    SetI(Addr),
+    /// BNNN
+    SetPcToV0PlusAddr(Addr),
+    /// CXNN
+    SetVxRand(Reg, Const),
+    /// DXYN
+    Draw(Reg, Reg, Const),
+    /// EX9E
+    IfKeyEqVx(Reg),
+    /// EXA1
+    IfKeyNeqVx(Reg),
+    /// FX07 
+    SetRegToDelayTimer(Reg),
+    /// FX0A
+    SetRegToGetKey(Reg),
+    /// FX15
+    SetDelayTimerToReg(Reg),
+    /// FX18
+    SetSoundTimerToReg(Reg),
+    /// FX1E
+    AddRegToI(Reg),
+    /// FX29
+    SetIToSpriteAddrVx(Reg),
+    /// FX33
+    SetIToBcdOfReg(Reg),
+    /// FX55
+    RegDump(Reg),
+    /// FX65
+    RegLoad(Reg)
 }
 
 impl Instruction {
