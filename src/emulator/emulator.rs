@@ -286,13 +286,13 @@ impl<I: Input, O: Output> Emulator<I, O> {
 
                 // Write to screen
                 let mut any_collisions = 0;
-                for y in 0 .. sprite_height as usize {
-                    let row: u8 = sprite_data[y];
-                    for x in 0 .. 8 {
-                        let new_pixel = row >> (7 - x) & 1; // Get bit number `bit_idx`
-                        let old_pixel = self.output.get(x_coord + x, y_coord + y);
+                for h in 0 .. sprite_height as usize {
+                    let row: u8 = sprite_data[h];
+                    for w in 0 .. 8 {
+                        let new_pixel = row >> (7 - w) & 1; // Get bit number `bit_idx`
+                        let old_pixel = self.output.get(x_coord + w, y_coord + h);
                         let xored_pixel = old_pixel ^ new_pixel; // XOR old pixel with new pixel
-                        self.output.set(x_coord + x, y_coord + y, xored_pixel); // Save xor'ed pixel
+                        self.output.set(x_coord + w, y_coord + h, xored_pixel); // Save xor'ed pixel
 
                         // Set pixel was unset, so we set the collision flag
                         if old_pixel == 1 && xored_pixel == 0 {
@@ -677,13 +677,62 @@ mod tests {
     }
 
     #[test]
-    fn draw() {}
+    fn draw() {
+        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let program = [
+            0b01001111,
+            0b01111001,
+            0b00101011,
+            0b01010110
+        ];
+        emulator.load(&program);
+        emulator.execute_many(&[
+            Instruction::SetI(Addr(0x200)),
+            Instruction::SetRegToConst(Reg(x), Const(0)),
+            Instruction::SetRegToConst(Reg(y), Const(0)),
+            Instruction::Draw(Reg(x), Reg(y), Const(program.len() as u8))
+        ]);
+        for h in 0..program.len() {
+            for w in 0..8 {
+                assert_eq!(emulator.output.get(w, h), (program[h] >> (7 - w)) & 1);
+            }
+        }
+    }
+
+    /// Input that always presses a given key.
+    struct ConstantInput(u8);
+    impl Input for ConstantInput {
+        fn get_key(&self) -> Option<u8> { Some(self.0) }
+        fn get_key_blocking(&self) -> u8 { self.0 }
+    }
 
     #[test]
-    fn if_key_eq_vx() {}
+    fn if_key_eq_vx() {
+        let mut emulator = Emulator::with_io(ConstantInput(0), DummyOutput::new());
+        
+        // Skip since both are 0
+        emulator.execute_single(Instruction::IfKeyEqVx(Reg(x)));
+        assert_eq!(emulator.program_counter, 0x204);
+
+        // Don't skip. Input is 0, Vx is 5
+        emulator.registers[0xA] = 5;
+        emulator.execute_single(Instruction::IfKeyEqVx(Reg(x)));
+        assert_eq!(emulator.program_counter, 0x206);
+    }
 
     #[test]
-    fn if_key_neq_vx() {}
+    fn if_key_neq_vx() {
+        let mut emulator = Emulator::with_io(ConstantInput(0), DummyOutput::new());
+        
+        // Don't skip since both are 0
+        emulator.execute_single(Instruction::IfKeyNeqVx(Reg(x)));
+        assert_eq!(emulator.program_counter, 0x202);
+
+        // Skip since they are different
+        emulator.registers[0xA] = 5;
+        emulator.execute_single(Instruction::IfKeyNeqVx(Reg(x)));
+        assert_eq!(emulator.program_counter, 0x206);
+    }
 
     #[test]
     fn set_reg_to_delay_timer() {}

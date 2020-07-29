@@ -85,7 +85,7 @@ mod tests {
 
     #[test]
     fn push_and_pop() {
-        let kb = Arc::new(KeyBuffer::new(Duration::from_millis(100)));
+        let kb = Arc::new(KeyBuffer::new(Duration::from_millis(1000)));
         
         let kb_c1 = kb.clone();
         let kb_c2 = kb.clone();
