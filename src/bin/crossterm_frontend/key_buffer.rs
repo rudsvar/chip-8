@@ -84,27 +84,6 @@ mod tests {
     use std::{sync::Arc, thread};
 
     #[test]
-    fn push_and_pop() {
-        let kb = Arc::new(KeyBuffer::new(Duration::from_millis(1000)));
-        
-        let kb_c1 = kb.clone();
-        let kb_c2 = kb.clone();
-        let input = KeyCode::Null;
-
-        let producer = thread::spawn(move || {
-            kb_c1.push(input)
-        });
-
-        let consumer = thread::spawn(move || {
-            kb_c2.pop()
-        });
-
-        producer.join().unwrap(); // Ensure the push has been done
-        let output = consumer.join().unwrap();
-        assert_eq!(output, Some(input));
-    }
-
-    #[test]
     fn push_and_pop_blocking() {
         let kb = Arc::new(KeyBuffer::new(Duration::from_millis(100)));
         

@@ -1,4 +1,4 @@
-use chip_8::emulator::emulator::{Input, Output};
+use chip_8::emulator::emulator::{EmulatorInput, EmulatorOutput};
 
 use super::key_manager::KeyManager;
 
@@ -22,7 +22,7 @@ impl CrosstermInput<'_> {
     }
 }
 
-impl Input for CrosstermInput<'_> {
+impl EmulatorInput for CrosstermInput<'_> {
     
     fn get_key(&self) -> Option<u8> {
         let key = self.key_manager.get_key()?;
@@ -93,7 +93,7 @@ impl Drop for CrosstermOutput {
     }
 }
 
-impl Output for CrosstermOutput {
+impl EmulatorOutput for CrosstermOutput {
 
     fn set(&mut self, x: usize, y: usize, state: u8) {
         let old_state = &mut self.cells[y][x];
