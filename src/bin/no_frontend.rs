@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use structopt::StructOpt;
 
-use chip_8::emulator::emulator::Emulator;
-use chip_8::emulator::emulator::{DummyInput, DummyOutput};
+use chip_8::emulator::Emulator;
+use chip_8::emulator::{input::DummyInput, output::DummyOutput};
 
 /// The program options.
 #[derive(StructOpt)]

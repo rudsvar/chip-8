@@ -1,4 +1,4 @@
-use chip_8::emulator::emulator::{EmulatorInput, EmulatorOutput};
+use chip_8::emulator::{input::EmulatorInput, output::EmulatorOutput};
 
 use super::key_manager::KeyManager;
 

@@ -1,7 +1,8 @@
 //! The CHIP-8 emulator as described at https://en.wikipedia.org/wiki/CHIP-8#Virtual_machine_description.
 
 use crate::emulator::instruction::*;
-use std::collections::HashMap;
+use crate::emulator::input::{EmulatorInput, DummyInput};
+use crate::emulator::output::{EmulatorOutput, DummyOutput};
 
 const MEM_SIZE: usize = 4096;
 const NUM_REGISTERS: usize = 16;
@@ -25,45 +26,6 @@ const FONT: [u8; 80] = [
 	0xF0,0x80,0xF0,0x80,0xF0, // E
     0xF0,0x80,0xF0,0x80,0x80, // F
 ];
-
-pub trait EmulatorInput {
-    fn get_key(&self) -> Option<u8>;
-    fn get_key_blocking(&self) -> u8;
-}
-
-pub struct DummyInput;
-
-impl EmulatorInput for DummyInput {
-    fn get_key(&self) -> Option<u8> { None }
-    fn get_key_blocking(&self) -> u8 { unimplemented!("Can't get blocking") }
-}
-
-pub trait EmulatorOutput {
-    fn set(&mut self, x: usize, y: usize, state: u8);
-    fn get(&self, x: usize, y: usize) -> u8;
-    fn clear(&mut self);
-    fn refresh(&mut self);
-}
-
-pub struct DummyOutput {
-    screen: HashMap<(usize, usize), u8>
-}
-
-impl DummyOutput {
-    fn new() -> DummyOutput { DummyOutput { screen: HashMap::new() } }
-}
-
-impl EmulatorOutput for DummyOutput {
-    fn set(&mut self, x: usize, y: usize, state: u8) { self.screen.insert((x,y), state); }
-    fn get(&self, x: usize, y: usize) -> u8 {
-        match self.screen.get(&(x, y)) {
-            Some(value) => { *value },
-            None => 0
-        }
-    }
-    fn clear(&mut self) { self.screen.clear(); }
-    fn refresh(&mut self) {}
-}
 
 pub struct Emulator<I: EmulatorInput, O: EmulatorOutput> {
     // Standard fields
