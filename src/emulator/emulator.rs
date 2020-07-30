@@ -242,16 +242,26 @@ impl<I: Input, O: Output> Emulator<I, O> {
                 self.registers[0xF] = if overflow { 0 } else { 1 };
             }
 
+            // Store least significant bit in VF then shift right
             Instruction::BitshiftRight(Reg(x)) => {
+                let value = self.registers[x as usize];
+                self.registers[0xF] = value & 1;
                 self.registers[x as usize] >>= 1;
             }
 
-            // TODO: VF is set to 0 when there's a borrow, and 1 when there isn't.
+            // Set VF to 0 when there's a borrow, and 1 when there isn't.
             Instruction::SetVxVyMinusVx(Reg(x), Reg(y)) => {
-                self.registers[x as usize] = self.registers[y as usize] - self.registers[x as usize];
+                let x_value = self.registers[x as usize];
+                let y_value = self.registers[y as usize];
+                let (sum, borrow) = y_value.overflowing_sub(x_value);
+                self.registers[x as usize] = sum;
+                self.registers[0xF] = if borrow { 0 } else { 1 };
             }
 
+            // Store most significant bit in VF then shift left
             Instruction::BitshiftLeft(Reg(x)) => {
+                let value = self.registers[x as usize];
+                self.registers[0xF] = (value & 0b10000000) >> 7;
                 self.registers[x as usize] <<= 1;
             }
 
@@ -358,7 +368,7 @@ impl<I: Input, O: Output> Emulator<I, O> {
 
                 // Get hundredths place
                 let hundredths = tens / 10;
-                self.memory[i] = (hundredths / 10) as u8;
+                self.memory[i] = (hundredths % 10) as u8;
             }
 
             // Dump register values up to Vx
@@ -590,14 +600,18 @@ mod tests {
     fn bitshift_right() {
         let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
 
-        emulator.execute_single(Instruction::SetRegToConst(Reg(x), Const(5)));
+        let value = 0b00001011;
+        emulator.execute_single(Instruction::SetRegToConst(Reg(x), Const(value)));
 
         emulator.execute_single(Instruction::BitshiftRight(Reg(x)));
-        assert_eq!(emulator.registers[x as usize], 5 >> 1);
+        assert_eq!(emulator.registers[x as usize], value >> 1);
+        assert_eq!(emulator.registers[0xF], 1);
         emulator.execute_single(Instruction::BitshiftRight(Reg(x)));
-        assert_eq!(emulator.registers[x as usize], 5 >> 2);
+        assert_eq!(emulator.registers[x as usize], value >> 2);
+        assert_eq!(emulator.registers[0xF], 1);
         emulator.execute_single(Instruction::BitshiftRight(Reg(x)));
-        assert_eq!(emulator.registers[x as usize], 5 >> 3);
+        assert_eq!(emulator.registers[x as usize], value >> 3);
+        assert_eq!(emulator.registers[0xF], 0);
     }
 
     #[test]
@@ -609,20 +623,37 @@ mod tests {
             Instruction::SetVxVyMinusVx(Reg(x), Reg(y))
         ]);
         assert_eq!(emulator.registers[x as usize], 2);
+        assert_eq!(emulator.registers[0xF], 1);
+    }
+
+    #[test]
+    fn set_vx_vy_minus_vx_borrow() {
+        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        emulator.execute_many(&[
+            Instruction::SetRegToConst(Reg(x), Const(20)),
+            Instruction::SetRegToConst(Reg(y), Const(14)),
+            Instruction::SetVxVyMinusVx(Reg(x), Reg(y))
+        ]);
+        assert_eq!(emulator.registers[x as usize], 250);
+        assert_eq!(emulator.registers[0xF], 0);
     }
 
     #[test]
     fn bitshift_left() {
         let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
         
-        emulator.execute_single(Instruction::SetRegToConst(Reg(x), Const(5)));
+        let value = 0b10110111;
+        emulator.execute_single(Instruction::SetRegToConst(Reg(x), Const(value)));
 
         emulator.execute_single(Instruction::BitshiftLeft(Reg(x)));
-        assert_eq!(emulator.registers[x as usize], 5 << 1);
+        assert_eq!(emulator.registers[x as usize], value << 1);
+        assert_eq!(emulator.registers[0xF], 1);
         emulator.execute_single(Instruction::BitshiftLeft(Reg(x)));
-        assert_eq!(emulator.registers[x as usize], 5 << 2);
+        assert_eq!(emulator.registers[x as usize], value << 2);
+        assert_eq!(emulator.registers[0xF], 0);
         emulator.execute_single(Instruction::BitshiftLeft(Reg(x)));
-        assert_eq!(emulator.registers[x as usize], 5 << 3);
+        assert_eq!(emulator.registers[x as usize], value << 3);
+        assert_eq!(emulator.registers[0xF], 1);
     }
 
     #[test]
@@ -735,29 +766,126 @@ mod tests {
     }
 
     #[test]
-    fn set_reg_to_delay_timer() {}
+    fn set_reg_to_delay_timer() {
+        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        emulator.execute_many(&[
+            Instruction::SetRegToConst(Reg(x), Const(123)),
+            Instruction::SetDelayTimerToReg(Reg(x))
+        ]);
+        assert_eq!(emulator.delay_timer, 123);
+        emulator.execute_single(Instruction::SetRegToDelayTimer(Reg(y)));
+        // Decreases one in previous step
+        assert_eq!(emulator.registers[y as usize], 122);
+    }
 
     #[test]
-    fn set_reg_to_get_key() {}
+    fn set_reg_to_get_key() {
+        let mut emulator = Emulator::with_io(ConstantInput(9), DummyOutput::new());
+        emulator.execute_single(Instruction::SetRegToGetKey(Reg(x)));
+        assert_eq!(emulator.registers[x as usize], 9);
+    }
 
     #[test]
-    fn set_delay_timer() {}
+    fn set_delay_timer() {
+        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        emulator.execute_many(&[
+            Instruction::SetRegToConst(Reg(x), Const(97)),
+            Instruction::SetDelayTimerToReg(Reg(x))
+        ]);
+        assert_eq!(emulator.delay_timer, 97);
+    }
 
     #[test]
-    fn set_sound_timer() {}
+    fn set_sound_timer() {
+        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        emulator.execute_many(&[
+            Instruction::SetRegToConst(Reg(x), Const(97)),
+            Instruction::SetSoundTimerToReg(Reg(x))
+        ]);
+        assert_eq!(emulator.sound_timer, 97);
+    }
 
     #[test]
-    fn add_reg_to_i() {}
+    fn add_reg_to_i() {
+        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        emulator.execute_many(&[
+            Instruction::SetRegToConst(Reg(x), Const(32)),
+            Instruction::SetI(Addr(32)),
+            Instruction::AddRegToI(Reg(x))
+        ]);
+        assert_eq!(emulator.i, 64);
+    }
 
     #[test]
-    fn set_i_to_sprite_addr_vx() {}
+    fn set_i_to_sprite_addr_vx() {
+        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let sprite_no = 8;
+        emulator.execute_many(&[
+            Instruction::SetRegToConst(Reg(x), Const(sprite_no)),
+            Instruction::SetIToSpriteAddrVx(Reg(x))
+        ]);
+        assert_eq!(emulator.i, 5 * sprite_no as u16); // Each sprite is 5 bytes wide
+    }
 
     #[test]
-    fn set_i_to_bcd_of_reg() {}
+    fn set_i_to_bcd_of_reg() {
+        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        emulator.execute_many(&[
+            Instruction::SetRegToConst(Reg(x), Const(184)),
+            Instruction::SetIToBcdOfReg(Reg(x))
+        ]);
+        assert_eq!(emulator.memory[emulator.i as usize + 0], 1);
+        assert_eq!(emulator.memory[emulator.i as usize + 1], 8);
+        assert_eq!(emulator.memory[emulator.i as usize + 2], 4);
+    }
 
     #[test]
-    fn reg_dump() {}
+    fn reg_dump() {
+        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+
+        // Set V0..V0xF to their index
+        for i in 0 ..= 0xF {
+            emulator.execute_single(Instruction::SetRegToConst(Reg(i), Const(i)));
+        }
+
+        // Dump all up to Vx
+        emulator.execute_single(Instruction::SetI(Addr(0x200)));
+        emulator.execute_single(Instruction::RegDump(Reg(x)));
+
+        // All register values up to x should be in memory
+        for offset in 0 .. x {
+            assert_eq!(emulator.memory[emulator.i as usize + offset as usize], offset);
+        }
+        
+        // The others should not have been dumped
+        for offset in x + 1 ..= 0xF {
+            assert_eq!(emulator.memory[emulator.i as usize + offset as usize], 0);
+        }
+    }
 
     #[test]
-    fn reg_load() {}
+    fn reg_load() {
+        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+
+        // Add some data
+        let mut data = Vec::new();
+        for offset in 0 ..= 0xF {
+            data.push(offset);
+        }
+        emulator.load(&data);
+
+        // Load into registers
+        emulator.execute_single(Instruction::SetI(Addr(0x200)));
+        emulator.execute_single(Instruction::RegLoad(Reg(x)));
+
+        // The others should not have been dumped
+        for offset in 0 ..= x {
+            assert_eq!(emulator.registers[offset as usize], offset);
+        }
+
+        // The others should not have been dumped
+        for offset in x + 1 ..= 0xF {
+            assert_eq!(emulator.registers[offset as usize], 0);
+        }
+    }
 }
