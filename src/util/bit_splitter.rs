@@ -4,7 +4,6 @@
 pub struct BitSplitter(u8, u8);
 
 impl BitSplitter {
-
     pub fn from_u16(value: u16) -> BitSplitter {
         BitSplitter((value >> 8) as u8, (value & 0x00FF) as u8)
     }
@@ -31,7 +30,7 @@ impl BitSplitter {
             (self.0 >> 4) & four_last_bits_mask,
             (self.0 >> 0) & four_last_bits_mask,
             (self.1 >> 4) & four_last_bits_mask,
-            (self.1 >> 0) & four_last_bits_mask
+            (self.1 >> 0) & four_last_bits_mask,
         )
     }
 

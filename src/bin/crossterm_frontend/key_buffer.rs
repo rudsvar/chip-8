@@ -1,8 +1,8 @@
 use crossterm::event::KeyCode;
 use std::{
+    collections::VecDeque,
+    sync::{Condvar, Mutex},
     time::{Duration, SystemTime},
-    sync::{Mutex, Condvar},
-    collections::VecDeque
 };
 
 /// A thread-safe buffer for storing keys and timestamps.
@@ -11,17 +11,16 @@ use std::{
 pub struct KeyBuffer {
     timeout: Duration,
     buffer: Mutex<VecDeque<(KeyCode, SystemTime)>>,
-    condvar: Condvar
+    condvar: Condvar,
 }
 
 impl KeyBuffer {
-
     /// Create a new `KeyBuffer`, but don't return keypresses that are older than `timeout`.
     pub fn new(timeout: Duration) -> KeyBuffer {
         KeyBuffer {
             timeout,
             buffer: Mutex::new(VecDeque::new()),
-            condvar: Condvar::new()
+            condvar: Condvar::new(),
         }
     }
 
@@ -29,7 +28,8 @@ impl KeyBuffer {
     fn clean(&self) {
         let mut buffer_guard = self.buffer.lock().unwrap();
         // Filter out old values
-        *buffer_guard = buffer_guard.iter()
+        *buffer_guard = buffer_guard
+            .iter()
             .filter(|(_, ts)| ts.elapsed().unwrap() < self.timeout)
             .map(|(a, b)| (*a, *b))
             .collect();
@@ -38,7 +38,9 @@ impl KeyBuffer {
     /// Push a new keypress to the buffer.
     pub fn push(&self, key_code: KeyCode) {
         self.clean();
-        self.buffer.lock().unwrap()
+        self.buffer
+            .lock()
+            .unwrap()
             .push_back((key_code, SystemTime::now()));
         self.condvar.notify_one();
     }
@@ -47,15 +49,14 @@ impl KeyBuffer {
     pub fn peek(&self) -> Option<KeyCode> {
         self.clean();
         // Select the keycode component
-        self.buffer.lock().unwrap()
-            .front()
-            .map(|(kc, _)| *kc)
+        self.buffer.lock().unwrap().front().map(|(kc, _)| *kc)
     }
 
     /// Pop a keypress from the buffer if a fresh enough one exists.
     pub fn pop(&self) -> Option<KeyCode> {
         let mut buffer_guard = self.buffer.lock().unwrap();
-        buffer_guard.pop_front()
+        buffer_guard
+            .pop_front()
             .filter(|(_, ts)| ts.elapsed().unwrap() < self.timeout)
             .map(|(kc, _)| kc)
     }
@@ -86,14 +87,12 @@ mod tests {
     #[test]
     fn push_and_pop_blocking() {
         let kb = Arc::new(KeyBuffer::new(Duration::from_millis(100)));
-        
+
         let kb_c1 = kb.clone();
         let kb_c2 = kb.clone();
         let input = KeyCode::Null;
 
-        let consumer = thread::spawn(move || {
-            kb_c2.pop_blocking()
-        });
+        let consumer = thread::spawn(move || kb_c2.pop_blocking());
 
         let producer = thread::spawn(move || {
             thread::sleep(Duration::from_millis(10));

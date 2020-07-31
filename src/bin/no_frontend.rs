@@ -14,7 +14,6 @@ struct Opt {
 }
 
 fn main() -> std::io::Result<()> {
-
     env_logger::init();
 
     // Get configuration and read input file
@@ -29,6 +28,6 @@ fn main() -> std::io::Result<()> {
     // Start execution
     loop {
         emulator.step();
-        std::thread::sleep(std::time::Duration::from_millis(1_000/60));
+        std::thread::sleep(std::time::Duration::from_millis(1_000 / 60));
     }
 }

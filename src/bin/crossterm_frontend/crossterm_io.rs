@@ -2,28 +2,25 @@ use chip_8::emulator::{input::EmulatorInput, output::EmulatorOutput};
 
 use super::key_manager::KeyManager;
 
-use std::io::{stdout, Write};
-use crossterm::{execute, cursor};
-use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen, Clear, ClearType};
 use crossterm::event::KeyCode;
+use crossterm::terminal::{self, Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen};
+use crossterm::{cursor, execute};
+use std::io::{stdout, Write};
 
 const SCREEN_WIDTH: usize = 128;
 const SCREEN_HEIGHT: usize = 64;
 
 pub struct CrosstermInput<'a> {
-    key_manager: &'a KeyManager
+    key_manager: &'a KeyManager,
 }
 
 impl CrosstermInput<'_> {
-    pub fn new(key_manager: &KeyManager) -> CrosstermInput{
-        CrosstermInput {
-            key_manager
-        }
+    pub fn new(key_manager: &KeyManager) -> CrosstermInput {
+        CrosstermInput { key_manager }
     }
 }
 
 impl EmulatorInput for CrosstermInput<'_> {
-    
     fn get_key(&self) -> Option<u8> {
         let key = self.key_manager.get_key()?;
         key_to_u8(key)
@@ -41,7 +38,7 @@ impl EmulatorInput for CrosstermInput<'_> {
 }
 
 pub struct CrosstermOutput {
-    cells: [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT]
+    cells: [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT],
 }
 
 impl CrosstermOutput {
@@ -49,8 +46,8 @@ impl CrosstermOutput {
         execute!(stdout(), EnterAlternateScreen);
         execute!(stdout(), cursor::Hide);
         terminal::enable_raw_mode();
-        let bottom = SCREEN_HEIGHT+2;
-        let right = SCREEN_WIDTH+2;
+        let bottom = SCREEN_HEIGHT + 2;
+        let right = SCREEN_WIDTH + 2;
         for y in 1..=bottom {
             for x in 1..=right {
                 if y == 1 || y == bottom || x == 1 || x == right {
@@ -75,7 +72,7 @@ impl CrosstermOutput {
             }
         }
         CrosstermOutput {
-            cells: [[0; SCREEN_WIDTH]; SCREEN_HEIGHT]
+            cells: [[0; SCREEN_WIDTH]; SCREEN_HEIGHT],
         }
     }
 
@@ -94,7 +91,6 @@ impl Drop for CrosstermOutput {
 }
 
 impl EmulatorOutput for CrosstermOutput {
-
     fn set(&mut self, x: usize, y: usize, state: u8) {
         let old_state = &mut self.cells[y][x];
         if *old_state != state {
@@ -115,7 +111,7 @@ impl EmulatorOutput for CrosstermOutput {
     }
 
     fn refresh(&mut self) {
-        execute!(stdout(), cursor::MoveTo(1,1));
+        execute!(stdout(), cursor::MoveTo(1, 1));
         for y in 0..SCREEN_HEIGHT {
             for x in 0..SCREEN_WIDTH {
                 self.draw(x, y, self.cells[y][x]);
@@ -127,11 +123,7 @@ impl EmulatorOutput for CrosstermOutput {
 
 fn key_to_u8(key: KeyCode) -> Option<u8> {
     match key {
-        KeyCode::Char(c) => {
-            c.to_digit(10)
-                .filter(|c| *c <= 0xF)
-                .map(|c| c as u8)
-        }
-        _ => None
+        KeyCode::Char(c) => c.to_digit(10).filter(|c| *c <= 0xF).map(|c| c as u8),
+        _ => None,
     }
 }

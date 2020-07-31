@@ -1,4 +1,3 @@
-
 /// Represents an input device that is capable of providing keys in the range 0..0xF.
 pub trait EmulatorInput {
     fn get_key(&self) -> Option<u8>;
@@ -9,6 +8,10 @@ pub trait EmulatorInput {
 pub struct DummyInput;
 
 impl EmulatorInput for DummyInput {
-    fn get_key(&self) -> Option<u8> { None }
-    fn get_key_blocking(&self) -> u8 { 0 }
+    fn get_key(&self) -> Option<u8> {
+        None
+    }
+    fn get_key_blocking(&self) -> u8 {
+        0
+    }
 }

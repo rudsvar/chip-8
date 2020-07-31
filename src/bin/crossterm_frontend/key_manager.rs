@@ -1,8 +1,8 @@
-use std::thread::{self, JoinHandle};
-use std::sync::{Arc, Mutex};
-use std::time::{Duration};
-use crossterm::event::{read, KeyCode, Event};
 use super::key_buffer::KeyBuffer;
+use crossterm::event::{read, Event, KeyCode};
+use std::sync::{Arc, Mutex};
+use std::thread::{self, JoinHandle};
+use std::time::Duration;
 
 pub struct KeyManager {
     stop: Arc<Mutex<bool>>,
@@ -13,7 +13,6 @@ pub struct KeyManager {
 /// A struct for managing keypresses that will automatically
 /// start a thread that grabs keypresses.
 impl KeyManager {
-    
     // Start even listener thread
     pub fn new() -> KeyManager {
         let shared_data = Arc::new(Mutex::new(false));
@@ -22,7 +21,7 @@ impl KeyManager {
         KeyManager {
             stop: shared_data,
             key_buffer,
-            event_listener
+            event_listener,
         }
     }
 

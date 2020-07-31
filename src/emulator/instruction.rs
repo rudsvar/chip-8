@@ -73,7 +73,7 @@ pub enum Instruction {
     IfKeyEqVx(Reg),
     /// EXA1
     IfKeyNeqVx(Reg),
-    /// FX07 
+    /// FX07
     SetRegToDelayTimer(Reg),
     /// FX0A
     SetRegToGetKey(Reg),
@@ -90,11 +90,10 @@ pub enum Instruction {
     /// FX55
     RegDump(Reg),
     /// FX65
-    RegLoad(Reg)
+    RegLoad(Reg),
 }
 
 impl Instruction {
-
     fn split_u16(value: u16) -> (u8, u8) {
         let left = (value & 0xFF00) >> 8;
         let right = value & 0x00FF;
@@ -152,7 +151,6 @@ impl Instruction {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
 
@@ -164,44 +162,139 @@ mod tests {
         assert_eq!(Instruction::Return, Instruction::from_u16(0x00EE));
         assert_eq!(Instruction::Goto(Addr(0x25)), Instruction::from_u16(0x1025));
         assert_eq!(Instruction::Call(Addr(0x37)), Instruction::from_u16(0x2037));
-        assert_eq!(Instruction::IfRegEqConst(Reg(0xA), Const(8)), Instruction::from_u16(0x3A08));
-        assert_eq!(Instruction::IfRegNeqConst(Reg(0xA), Const(8)), Instruction::from_u16(0x4A08));
-        assert_eq!(Instruction::IfRegNeqConst(Reg(0xA), Const(8)), Instruction::from_u16(0x4A08));
-        assert_eq!(Instruction::SetRegToConst(Reg(0xB), Const(0x23)), Instruction::from_u16(0x6B23));
-        assert_eq!(Instruction::IncRegByConst(Reg(0xC), Const(0xA1)), Instruction::from_u16(0x7CA1));
-        assert_eq!(Instruction::SetRegToReg(Reg(0xA), Reg(0xB)), Instruction::from_u16(0x8AB0));
-        assert_eq!(Instruction::BitwiseOr(Reg(0xD), Reg(0xE)), Instruction::from_u16(0x8DE1));
-        assert_eq!(Instruction::BitwiseAnd(Reg(0xD), Reg(0xE)), Instruction::from_u16(0x8DE2));
-        assert_eq!(Instruction::BitwiseXor(Reg(0xD), Reg(0xE)), Instruction::from_u16(0x8DE3));
-        assert_eq!(Instruction::IncRegByReg(Reg(0xA), Reg(0xB)), Instruction::from_u16(0x8AB4));
-        assert_eq!(Instruction::DecRegByReg(Reg(0xA), Reg(0xB)), Instruction::from_u16(0x8AB5));
-        assert_eq!(Instruction::BitshiftRight(Reg(0xA)), Instruction::from_u16(0x8AB6));
-        assert_eq!(Instruction::SetVxVyMinusVx(Reg(0xA), Reg(0xB)), Instruction::from_u16(0x8AB7));
-        assert_eq!(Instruction::BitshiftLeft(Reg(0xA)), Instruction::from_u16(0x8A0E));
-        assert_eq!(Instruction::IfRegNeqReg(Reg(0xA), Reg(0xB)), Instruction::from_u16(0x9AB0));
+        assert_eq!(
+            Instruction::IfRegEqConst(Reg(0xA), Const(8)),
+            Instruction::from_u16(0x3A08)
+        );
+        assert_eq!(
+            Instruction::IfRegNeqConst(Reg(0xA), Const(8)),
+            Instruction::from_u16(0x4A08)
+        );
+        assert_eq!(
+            Instruction::IfRegNeqConst(Reg(0xA), Const(8)),
+            Instruction::from_u16(0x4A08)
+        );
+        assert_eq!(
+            Instruction::SetRegToConst(Reg(0xB), Const(0x23)),
+            Instruction::from_u16(0x6B23)
+        );
+        assert_eq!(
+            Instruction::IncRegByConst(Reg(0xC), Const(0xA1)),
+            Instruction::from_u16(0x7CA1)
+        );
+        assert_eq!(
+            Instruction::SetRegToReg(Reg(0xA), Reg(0xB)),
+            Instruction::from_u16(0x8AB0)
+        );
+        assert_eq!(
+            Instruction::BitwiseOr(Reg(0xD), Reg(0xE)),
+            Instruction::from_u16(0x8DE1)
+        );
+        assert_eq!(
+            Instruction::BitwiseAnd(Reg(0xD), Reg(0xE)),
+            Instruction::from_u16(0x8DE2)
+        );
+        assert_eq!(
+            Instruction::BitwiseXor(Reg(0xD), Reg(0xE)),
+            Instruction::from_u16(0x8DE3)
+        );
+        assert_eq!(
+            Instruction::IncRegByReg(Reg(0xA), Reg(0xB)),
+            Instruction::from_u16(0x8AB4)
+        );
+        assert_eq!(
+            Instruction::DecRegByReg(Reg(0xA), Reg(0xB)),
+            Instruction::from_u16(0x8AB5)
+        );
+        assert_eq!(
+            Instruction::BitshiftRight(Reg(0xA)),
+            Instruction::from_u16(0x8AB6)
+        );
+        assert_eq!(
+            Instruction::SetVxVyMinusVx(Reg(0xA), Reg(0xB)),
+            Instruction::from_u16(0x8AB7)
+        );
+        assert_eq!(
+            Instruction::BitshiftLeft(Reg(0xA)),
+            Instruction::from_u16(0x8A0E)
+        );
+        assert_eq!(
+            Instruction::IfRegNeqReg(Reg(0xA), Reg(0xB)),
+            Instruction::from_u16(0x9AB0)
+        );
         assert_eq!(Instruction::SetI(Addr(0x25)), Instruction::from_u16(0xA025));
-        assert_eq!(Instruction::SetPcToV0PlusAddr(Addr(0x25)), Instruction::from_u16(0xB025));
-        assert_eq!(Instruction::SetVxRand(Reg(0xA), Const(0x23)), Instruction::from_u16(0xCA23));
-        assert_eq!(Instruction::Draw(Reg(0xA), Reg(0xB), Const(0xC)), Instruction::from_u16(0xDABC));
-        assert_eq!(Instruction::IfKeyEqVx(Reg(0xA)), Instruction::from_u16(0xEA9E));
-        assert_eq!(Instruction::IfKeyNeqVx(Reg(0xA)), Instruction::from_u16(0xEAA1));
-        assert_eq!(Instruction::SetRegToDelayTimer(Reg(0xA)), Instruction::from_u16(0xFA07));
-        assert_eq!(Instruction::SetRegToGetKey(Reg(0xA)), Instruction::from_u16(0xFA0A));
-        assert_eq!(Instruction::SetDelayTimerToReg(Reg(0xA)), Instruction::from_u16(0xFA15));
-        assert_eq!(Instruction::SetSoundTimerToReg(Reg(0xA)), Instruction::from_u16(0xFA18));
-        assert_eq!(Instruction::AddRegToI(Reg(0xA)), Instruction::from_u16(0xFA1E));
-        assert_eq!(Instruction::SetIToSpriteAddrVx(Reg(0xA)), Instruction::from_u16(0xFA29));
-        assert_eq!(Instruction::SetIToBcdOfReg(Reg(0xA)), Instruction::from_u16(0xFA33));
-        assert_eq!(Instruction::RegDump(Reg(0xA)), Instruction::from_u16(0xFA55));
-        assert_eq!(Instruction::RegLoad(Reg(0xA)), Instruction::from_u16(0xFA65));
+        assert_eq!(
+            Instruction::SetPcToV0PlusAddr(Addr(0x25)),
+            Instruction::from_u16(0xB025)
+        );
+        assert_eq!(
+            Instruction::SetVxRand(Reg(0xA), Const(0x23)),
+            Instruction::from_u16(0xCA23)
+        );
+        assert_eq!(
+            Instruction::Draw(Reg(0xA), Reg(0xB), Const(0xC)),
+            Instruction::from_u16(0xDABC)
+        );
+        assert_eq!(
+            Instruction::IfKeyEqVx(Reg(0xA)),
+            Instruction::from_u16(0xEA9E)
+        );
+        assert_eq!(
+            Instruction::IfKeyNeqVx(Reg(0xA)),
+            Instruction::from_u16(0xEAA1)
+        );
+        assert_eq!(
+            Instruction::SetRegToDelayTimer(Reg(0xA)),
+            Instruction::from_u16(0xFA07)
+        );
+        assert_eq!(
+            Instruction::SetRegToGetKey(Reg(0xA)),
+            Instruction::from_u16(0xFA0A)
+        );
+        assert_eq!(
+            Instruction::SetDelayTimerToReg(Reg(0xA)),
+            Instruction::from_u16(0xFA15)
+        );
+        assert_eq!(
+            Instruction::SetSoundTimerToReg(Reg(0xA)),
+            Instruction::from_u16(0xFA18)
+        );
+        assert_eq!(
+            Instruction::AddRegToI(Reg(0xA)),
+            Instruction::from_u16(0xFA1E)
+        );
+        assert_eq!(
+            Instruction::SetIToSpriteAddrVx(Reg(0xA)),
+            Instruction::from_u16(0xFA29)
+        );
+        assert_eq!(
+            Instruction::SetIToBcdOfReg(Reg(0xA)),
+            Instruction::from_u16(0xFA33)
+        );
+        assert_eq!(
+            Instruction::RegDump(Reg(0xA)),
+            Instruction::from_u16(0xFA55)
+        );
+        assert_eq!(
+            Instruction::RegLoad(Reg(0xA)),
+            Instruction::from_u16(0xFA65)
+        );
     }
 
     #[test]
     fn from_two_u8_equals_from_u16() {
-        assert_eq!(Instruction::from_two_u8(0x12, 0x34), Instruction::from_u16(0x1234));
-        assert_eq!(Instruction::from_two_u8(0x2F, 0x2F), Instruction::from_u16(0x2F2F));
-        assert_eq!(Instruction::from_two_u8(0x10, 0x20), Instruction::from_u16(0x1020));
-
+        assert_eq!(
+            Instruction::from_two_u8(0x12, 0x34),
+            Instruction::from_u16(0x1234)
+        );
+        assert_eq!(
+            Instruction::from_two_u8(0x2F, 0x2F),
+            Instruction::from_u16(0x2F2F)
+        );
+        assert_eq!(
+            Instruction::from_two_u8(0x10, 0x20),
+            Instruction::from_u16(0x1020)
+        );
     }
 
     #[test]
@@ -210,6 +303,5 @@ mod tests {
         assert_eq!((0xFF, 0xFF), Instruction::split_u16(0xFFFF));
         assert_eq!((0x00, 0x00), Instruction::split_u16(0x0000));
         assert_eq!((0xF0, 0xF0), Instruction::split_u16(0xF0F0));
-
     }
 }

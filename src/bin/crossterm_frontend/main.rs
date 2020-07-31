@@ -23,7 +23,6 @@ struct Opt {
 }
 
 fn main() -> std::io::Result<()> {
-
     env_logger::init();
 
     // Get configuration and read input file
@@ -34,16 +33,13 @@ fn main() -> std::io::Result<()> {
     let key_manager = KeyManager::new();
 
     // Load instructions into emulator memory
-    let mut emulator = Emulator::with_io(
-        CrosstermInput::new(&key_manager),
-        CrosstermOutput::new()
-    );
+    let mut emulator = Emulator::with_io(CrosstermInput::new(&key_manager), CrosstermOutput::new());
     emulator.load(&program);
 
     // Start execution
     while key_manager.get_key() != Some(KeyCode::Char('q')) {
         emulator.step();
-        std::thread::sleep(std::time::Duration::from_millis(1_000/120));
+        std::thread::sleep(std::time::Duration::from_millis(1_000 / 120));
     }
 
     Ok(())
