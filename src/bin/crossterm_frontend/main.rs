@@ -23,7 +23,7 @@ struct Opt {
 }
 
 fn main() -> std::io::Result<()> {
-    env_logger::init();
+    pretty_env_logger::init();
 
     // Get configuration and read input file
     let opt = Opt::from_args();
