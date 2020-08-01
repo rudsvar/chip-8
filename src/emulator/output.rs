@@ -21,6 +21,12 @@ impl DummyOutput {
     }
 }
 
+impl Default for DummyOutput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EmulatorOutput for DummyOutput {
     fn set(&mut self, x: usize, y: usize, state: u8) {
         self.screen.insert((x, y), state);

@@ -65,13 +65,10 @@ impl KeyBuffer {
     pub fn pop_blocking(&self) -> KeyCode {
         let mut buffer_guard = self.buffer.lock().unwrap();
         loop {
-            match buffer_guard.pop_front() {
-                Some((key_code, timestamp)) => {
-                    if timestamp.elapsed().unwrap() < self.timeout {
-                        return key_code;
-                    }
+            if let Some((key_code, timestamp)) = buffer_guard.pop_front() {
+                if timestamp.elapsed().unwrap() < self.timeout {
+                    return key_code;
                 }
-                None => {}
             }
             buffer_guard = self.condvar.wait(buffer_guard).unwrap();
         }
@@ -87,16 +84,15 @@ mod tests {
     #[test]
     fn push_and_pop_blocking() {
         let kb = Arc::new(KeyBuffer::new(Duration::from_millis(100)));
+        let kb_clone = kb.clone();
 
-        let kb_c1 = kb.clone();
-        let kb_c2 = kb.clone();
         let input = KeyCode::Null;
 
-        let consumer = thread::spawn(move || kb_c2.pop_blocking());
+        let consumer = thread::spawn(move || kb.pop_blocking());
 
         let producer = thread::spawn(move || {
             thread::sleep(Duration::from_millis(10));
-            kb_c1.push(input)
+            kb_clone.push(input)
         });
 
         // Allow the consumer to arrive first

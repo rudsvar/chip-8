@@ -48,9 +48,7 @@ impl<I: EmulatorInput, O: EmulatorOutput> Emulator<I, O> {
         let mut memory = [0; MEM_SIZE];
 
         // Load font
-        for i in 0..FONT.len() {
-            memory[i] = FONT[i];
-        }
+        memory[0..FONT.len()].copy_from_slice(&FONT);
 
         Emulator {
             memory,

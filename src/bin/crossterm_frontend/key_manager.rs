@@ -1,13 +1,14 @@
 use super::key_buffer::KeyBuffer;
 use crossterm::event::{read, Event, KeyCode};
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 pub struct KeyManager {
-    stop: Arc<Mutex<bool>>,
+    stop: Arc<AtomicBool>,
     key_buffer: Arc<KeyBuffer>,
-    event_listener: JoinHandle<()>,
+    event_listener: Option<JoinHandle<()>>,
 }
 
 /// A struct for managing keypresses that will automatically
@@ -15,13 +16,13 @@ pub struct KeyManager {
 impl KeyManager {
     // Start even listener thread
     pub fn new() -> KeyManager {
-        let shared_data = Arc::new(Mutex::new(false));
+        let stop = Arc::new(AtomicBool::new(false));
         let key_buffer = Arc::new(KeyBuffer::new(Duration::from_millis(250)));
-        let event_listener = event_listener(shared_data.clone(), key_buffer.clone());
+        let event_listener = event_listener(stop.clone(), key_buffer.clone());
         KeyManager {
-            stop: shared_data,
+            stop,
             key_buffer,
-            event_listener,
+            event_listener: Some(event_listener),
         }
     }
 
@@ -39,29 +40,29 @@ impl KeyManager {
 impl Drop for KeyManager {
     fn drop(&mut self) {
         // Tell the event listener to stop
-        *self.stop.lock().unwrap() = true;
-        // TODO: Wait for it?
+        self.stop.store(true, Ordering::Relaxed);
+        // Wait for it to stop
+        if let Some(thread) = self.event_listener.take() {
+            thread.join().expect("Could not join event listener thread");
+        }
     }
 }
 
 /// Starts a thread that listens for key events and pushes them to the key buffer.
-fn event_listener(stop: Arc<Mutex<bool>>, key_buffer: Arc<KeyBuffer>) -> JoinHandle<()> {
+fn event_listener(stop: Arc<AtomicBool>, key_buffer: Arc<KeyBuffer>) -> JoinHandle<()> {
     thread::spawn(move || {
         loop {
             let event = read().unwrap();
             log::info!("Got event {:?}", event);
 
             // Check the shared data, and possibly stop
-            if *stop.lock().unwrap() {
+            if stop.load(Ordering::Relaxed) {
                 break;
             }
 
-            // Investigate the event
-            match event {
-                Event::Key(key_event) => {
-                    key_buffer.push(key_event.code);
-                }
-                _ => {}
+            // Push keypresses into the key buffer
+            if let Event::Key(key_event) = event {
+                key_buffer.push(key_event.code);
             }
         }
     })

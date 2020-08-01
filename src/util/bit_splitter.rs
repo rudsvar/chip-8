@@ -27,10 +27,10 @@ impl BitSplitter {
     pub fn as_four_u8(&self) -> (u8, u8, u8, u8) {
         let four_last_bits_mask = 0x0F;
         (
-            (self.0 >> 4) & four_last_bits_mask,
-            (self.0 >> 0) & four_last_bits_mask,
-            (self.1 >> 4) & four_last_bits_mask,
-            (self.1 >> 0) & four_last_bits_mask,
+            self.0 >> 4 & four_last_bits_mask,
+            self.0 & four_last_bits_mask,
+            self.1 >> 4 & four_last_bits_mask,
+            self.1 & four_last_bits_mask,
         )
     }
 

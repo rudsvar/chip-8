@@ -29,9 +29,8 @@ impl EmulatorInput for CrosstermInput<'_> {
     fn get_key_blocking(&self) -> u8 {
         loop {
             let key = self.key_manager.get_key_blocking();
-            match key_to_u8(key) {
-                Some(i) => return i,
-                None => {}
+            if let Some(i) = key_to_u8(key) {
+                return i;
             }
         }
     }
