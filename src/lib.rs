@@ -13,9 +13,10 @@ You can then use the keys 0-9 and a-f to to give input, but which ones to use de
 If you are not interested in handling input (key presses and such),
 then you can use `Emulator::new()` to get an emulator to work with.
 
+The main way of running a program is to load instructions as bytes.
+
 ```rust
 use chip_8::emulator::{Emulator, input::DummyInput, output::DummyOutput};
-use chip_8::emulator::instruction::{Instruction, Reg, Const, Addr};
 
 let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
 
@@ -23,6 +24,15 @@ let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
 let clear_display = [0x00, 0xE0];
 emulator.load(&clear_display);
 emulator.step(); // Will now clear the display
+```
+
+Alternatively, you can experiment by executing instructions manually.
+
+```rust
+use chip_8::emulator::{Emulator, input::DummyInput, output::DummyOutput};
+use chip_8::emulator::instruction::{Instruction, Reg, Const, Addr};
+
+let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
 
 // Execute instructions manually
 emulator.execute_single(Instruction::ClearScreen);
@@ -46,8 +56,6 @@ Take a look at `src/emulator/input.rs` and `src/emulator/output.rs` to see how t
 use chip_8::emulator::Emulator;
 
 let mut emulator = Emulator::with_io(MyInput::new(), MyOutput::new());
-
-// Then operate on the emulator as usual.
 ```
 
 You can then implement the emulator using your own custom frontend, as done with crossterm in crossterm_frontend.
