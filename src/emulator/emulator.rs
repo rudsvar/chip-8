@@ -252,8 +252,7 @@ impl<I: EmulatorInput, O: EmulatorOutput> Emulator<I, O> {
 
                 // Write to screen
                 let mut any_collisions = 0;
-                for h in 0..sprite_height as usize {
-                    let row: u8 = sprite_data[h];
+                for (h, row) in sprite_data.iter().enumerate() {
                     for w in 0..8 {
                         let new_pixel = row >> (7 - w) & 1; // Get bit number `bit_idx`
                         let old_pixel = self.output.get(x_coord + w, y_coord + h);
