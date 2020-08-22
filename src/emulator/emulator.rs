@@ -72,9 +72,9 @@ impl<I: EmulatorInput, O: EmulatorOutput> Emulator<I, O> {
 
     /// Copy a program into memory at 0x200.
     pub fn load(&mut self, program: &[u8]) {
-        for i in 0..std::cmp::min(program.len(), self.memory.len() - 0x200) {
-            self.memory[self.program_counter as usize + i] = program[i];
-        }
+        let pc = self.program_counter as usize;
+        let len = std::cmp::min(program.len(), self.memory.len() - pc);
+        self.memory[pc..pc + len].copy_from_slice(program);
     }
 
     /// Perform a single step, which will update timers,
@@ -658,9 +658,9 @@ mod tests {
             Instruction::SetRegToConst(Reg(Y), Const(0)),
             Instruction::Draw(Reg(X), Reg(Y), Const(program.len() as u8)),
         ]);
-        for h in 0..program.len() {
+        for (h, row) in program.iter().enumerate() {
             for w in 0..8 {
-                assert_eq!(emulator.output.get(w, h), (program[h] >> (7 - w)) & 1);
+                assert_eq!(emulator.output.get(w, h), (row >> (7 - w)) & 1);
             }
         }
     }
