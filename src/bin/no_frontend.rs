@@ -22,7 +22,7 @@ fn main() -> std::io::Result<()> {
     let program = std::fs::read(opt.input)?;
 
     // Load instructions into emulator memory
-    let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+    let mut emulator = Emulator::dummy();
     emulator.load(&program);
 
     // Start execution

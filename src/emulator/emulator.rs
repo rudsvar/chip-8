@@ -42,9 +42,16 @@ pub struct Emulator<I: EmulatorInput, O: EmulatorOutput> {
     output: O,
 }
 
+impl Emulator<DummyInput, DummyOutput> {
+    /// Create a new emulator with dummy input and output
+    pub fn dummy() -> Emulator<DummyInput, DummyOutput> {
+        Emulator::new(DummyInput, DummyOutput::new())
+    }
+}
+
 impl<I: EmulatorInput, O: EmulatorOutput> Emulator<I, O> {
     /// Create a new emulator with input and output
-    pub fn with_io(input: I, output: O) -> Emulator<I, O> {
+    pub fn new(input: I, output: O) -> Self {
         let mut memory = [0; MEM_SIZE];
 
         // Load font
@@ -63,11 +70,6 @@ impl<I: EmulatorInput, O: EmulatorOutput> Emulator<I, O> {
             input,
             output,
         }
-    }
-
-    /// Create a new emulator with dummy input and output
-    pub fn new() -> Emulator<DummyInput, DummyOutput> {
-        Emulator::with_io(DummyInput, DummyOutput::new())
     }
 
     /// Copy a program into memory at 0x200.
@@ -356,7 +358,7 @@ mod tests {
 
     #[test]
     fn clear_screen_clears_screen() {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
         emulator.output.set(0, 0, 1);
         emulator.output.set(4, 8, 2);
         emulator.output.set(3, 5, 3);
@@ -370,7 +372,7 @@ mod tests {
     #[test_case(0x250; "when addr is 0x250")]
     #[test_case(0x350; "when addr is 0x350")]
     fn goto_goes_to(addr: u16) {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
         emulator.execute_single(Instruction::Goto(Addr(addr)));
         assert_eq!(emulator.program_counter, addr);
     }
@@ -378,7 +380,7 @@ mod tests {
     #[test]
     fn return_after_call_is_neutral() {
         // Create emulator
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
         assert_eq!(emulator.program_counter, 0x200);
 
         // Write program with call and return
@@ -400,7 +402,7 @@ mod tests {
     #[test_case(0, 0 => 0x204; "skips when equal")]
     #[test_case(3, 8 => 0x202; "does not skip when not equal")]
     fn if_reg_eq_const(reg_value: u8, const_value: u8) -> u16 {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
         emulator.registers[X as usize] = reg_value;
         emulator.execute_single(Instruction::IfRegEqConst(Reg(X), Const(const_value)));
         emulator.program_counter
@@ -409,7 +411,7 @@ mod tests {
     #[test_case(0, 0 => 0x202; "does not skip when equal")]
     #[test_case(3, 8 => 0x204; "skips when not equal")]
     fn if_reg_neq_const(reg_value: u8, const_value: u8) -> u16 {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
         emulator.registers[X as usize] = reg_value;
         emulator.execute_single(Instruction::IfRegNeqConst(Reg(X), Const(const_value)));
         emulator.program_counter
@@ -417,7 +419,7 @@ mod tests {
 
     #[test]
     fn if_reg_eq_reg() {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
 
         emulator.execute_many(&[
             Instruction::SetRegToConst(Reg(X), Const(3)),
@@ -438,7 +440,7 @@ mod tests {
 
     #[test]
     fn set_reg_to_const() {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
         let value = 7;
         assert_eq!(emulator.registers[X as usize], 0);
         emulator.execute_single(Instruction::SetRegToConst(Reg(X), Const(value)));
@@ -447,7 +449,7 @@ mod tests {
 
     #[test]
     fn inc_reg_by_const() {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
         let value = 7;
         assert_eq!(emulator.registers[X as usize], 0);
         emulator.execute_single(Instruction::IncRegByConst(Reg(X), Const(value)));
@@ -458,7 +460,7 @@ mod tests {
 
     #[test]
     fn set_reg_to_reg() {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
         emulator.execute_many(&[
             Instruction::SetRegToConst(Reg(X), Const(4)),
             Instruction::SetRegToConst(Reg(Y), Const(8)),
@@ -469,7 +471,7 @@ mod tests {
 
     #[test]
     fn bitwise_or() {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
         emulator.execute_many(&[
             Instruction::SetRegToConst(Reg(0xA), Const(0b0101)),
             Instruction::SetRegToConst(Reg(0xB), Const(0b1100)),
@@ -480,7 +482,7 @@ mod tests {
 
     #[test]
     fn bitwise_and() {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
         emulator.execute_many(&[
             Instruction::SetRegToConst(Reg(0xA), Const(0b0101)),
             Instruction::SetRegToConst(Reg(0xB), Const(0b1101)),
@@ -491,7 +493,7 @@ mod tests {
 
     #[test]
     fn bitwise_xor() {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
         emulator.execute_many(&[
             Instruction::SetRegToConst(Reg(0xA), Const(0b010101)),
             Instruction::SetRegToConst(Reg(0xB), Const(0b110111)),
@@ -505,7 +507,7 @@ mod tests {
     #[test_case(78, 10 => (88, 0); "case 3")]
     #[test_case(75, 240 => (59, 1); "when result overflows")]
     fn inc_reg_by_reg(x_value: u8, y_value: u8) -> (u8, u8) {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
         emulator.execute_many(&[
             Instruction::SetRegToConst(Reg(X), Const(x_value)),
             Instruction::SetRegToConst(Reg(Y), Const(y_value)),
@@ -516,7 +518,7 @@ mod tests {
 
     #[test]
     fn dec_reg_by_reg() {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
         emulator.execute_many(&[
             Instruction::SetRegToConst(Reg(X), Const(10)),
             Instruction::SetRegToConst(Reg(Y), Const(7)),
@@ -527,7 +529,7 @@ mod tests {
 
     #[test]
     fn dec_reg_by_reg_underflow() {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
         emulator.execute_many(&[
             Instruction::SetRegToConst(Reg(X), Const(5)),
             Instruction::SetRegToConst(Reg(Y), Const(45)),
@@ -538,7 +540,7 @@ mod tests {
 
     #[test]
     fn bitshift_right() {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
 
         let value = 0b00001011;
         emulator.execute_single(Instruction::SetRegToConst(Reg(X), Const(value)));
@@ -556,7 +558,7 @@ mod tests {
 
     #[test]
     fn set_vx_vy_minus_vx() {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
         emulator.execute_many(&[
             Instruction::SetRegToConst(Reg(X), Const(12)),
             Instruction::SetRegToConst(Reg(Y), Const(14)),
@@ -568,7 +570,7 @@ mod tests {
 
     #[test]
     fn set_vx_vy_minus_vx_borrow() {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
         emulator.execute_many(&[
             Instruction::SetRegToConst(Reg(X), Const(20)),
             Instruction::SetRegToConst(Reg(Y), Const(14)),
@@ -580,7 +582,7 @@ mod tests {
 
     #[test]
     fn bitshift_left() {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
 
         let value = 0b10110111;
         emulator.execute_single(Instruction::SetRegToConst(Reg(X), Const(value)));
@@ -598,7 +600,7 @@ mod tests {
 
     #[test]
     fn if_reg_neq_reg() {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
 
         emulator.execute_many(&[
             Instruction::SetRegToConst(Reg(X), Const(3)),
@@ -619,7 +621,7 @@ mod tests {
 
     #[test]
     fn set_i() {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
         assert_eq!(emulator.i, 0x0);
         emulator.execute_single(Instruction::SetI(Addr(0x232)));
         assert_eq!(emulator.i, 0x232);
@@ -627,7 +629,7 @@ mod tests {
 
     #[test]
     fn set_pc_to_v0_plus_addr() {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
         let v0 = 7;
         let addr = 0x400;
         emulator.execute_many(&[
@@ -639,7 +641,7 @@ mod tests {
 
     #[test]
     fn set_vx_rand() {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
         for _ in 0..10_000 {
             emulator.execute_single(Instruction::SetVxRand(Reg(X), Const(0x0F)));
             let value = emulator.registers[X as usize];
@@ -649,7 +651,7 @@ mod tests {
 
     #[test]
     fn draw() {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
         let program = [0b01001111, 0b01111001, 0b00101011, 0b01010110];
         emulator.load(&program);
         emulator.execute_many(&[
@@ -678,7 +680,7 @@ mod tests {
 
     #[test]
     fn if_key_eq_vx() {
-        let mut emulator = Emulator::with_io(ConstantInput(0), DummyOutput::new());
+        let mut emulator = Emulator::new(ConstantInput(0), DummyOutput::new());
 
         // Skip since both are 0
         emulator.execute_single(Instruction::IfKeyEqVx(Reg(X)));
@@ -692,7 +694,7 @@ mod tests {
 
     #[test]
     fn if_key_neq_vx() {
-        let mut emulator = Emulator::with_io(ConstantInput(0), DummyOutput::new());
+        let mut emulator = Emulator::new(ConstantInput(0), DummyOutput::new());
 
         // Don't skip since both are 0
         emulator.execute_single(Instruction::IfKeyNeqVx(Reg(X)));
@@ -706,7 +708,7 @@ mod tests {
 
     #[test]
     fn set_reg_to_delay_timer() {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
         emulator.execute_many(&[
             Instruction::SetRegToConst(Reg(X), Const(123)),
             Instruction::SetDelayTimerToReg(Reg(X)),
@@ -719,14 +721,14 @@ mod tests {
 
     #[test]
     fn set_reg_to_get_key() {
-        let mut emulator = Emulator::with_io(ConstantInput(9), DummyOutput::new());
+        let mut emulator = Emulator::new(ConstantInput(9), DummyOutput::new());
         emulator.execute_single(Instruction::SetRegToGetKey(Reg(X)));
         assert_eq!(emulator.registers[X as usize], 9);
     }
 
     #[test]
     fn set_delay_timer() {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
         emulator.execute_many(&[
             Instruction::SetRegToConst(Reg(X), Const(97)),
             Instruction::SetDelayTimerToReg(Reg(X)),
@@ -736,7 +738,7 @@ mod tests {
 
     #[test]
     fn set_sound_timer() {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
         emulator.execute_many(&[
             Instruction::SetRegToConst(Reg(X), Const(97)),
             Instruction::SetSoundTimerToReg(Reg(X)),
@@ -746,7 +748,7 @@ mod tests {
 
     #[test]
     fn add_reg_to_i() {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
         emulator.execute_many(&[
             Instruction::SetRegToConst(Reg(X), Const(32)),
             Instruction::SetI(Addr(32)),
@@ -757,7 +759,7 @@ mod tests {
 
     #[test]
     fn set_i_to_sprite_addr_vx() {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
         let sprite_no = 8;
         emulator.execute_many(&[
             Instruction::SetRegToConst(Reg(X), Const(sprite_no)),
@@ -768,19 +770,19 @@ mod tests {
 
     #[test]
     fn set_i_to_bcd_of_reg() {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
         emulator.execute_many(&[
             Instruction::SetRegToConst(Reg(X), Const(184)),
             Instruction::SetIToBcdOfReg(Reg(X)),
         ]);
-        assert_eq!(emulator.memory[emulator.i as usize + 0], 1);
+        assert_eq!(emulator.memory[emulator.i as usize], 1);
         assert_eq!(emulator.memory[emulator.i as usize + 1], 8);
         assert_eq!(emulator.memory[emulator.i as usize + 2], 4);
     }
 
     #[test]
     fn reg_dump() {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
 
         // Set V0..V0xF to their index
         for i in 0..=0xF {
@@ -807,7 +809,7 @@ mod tests {
 
     #[test]
     fn reg_load() {
-        let mut emulator = Emulator::<DummyInput, DummyOutput>::new();
+        let mut emulator = Emulator::dummy();
 
         // Add some data
         let mut data = Vec::new();
